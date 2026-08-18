@@ -1,0 +1,179 @@
+name: checks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  skills:
+    name: skill content and structure
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      # The core promise of this library is that it carries no
+      # organisation-specific detail. Enforced here, not by review.
+      #
+      # The leak-term list is deliberately not in this repository -- publishing
+      # an inventory of internal identifiers is the leak it exists to prevent.
+      # On a fork or a contributor PR the structural checks all still run and
+      # the scan reports itself as skipped. A release build supplies the list
+      # via the DBT_NAVIGATOR_TERMS secret.
+      - name: Pre-publication checks
+        env:
+          LEAK_TERMS: ${{ secrets.DBT_NAVIGATOR_TERMS }}
+        run: |
+          if [ -n "$LEAK_TERMS" ]; then
+            printf '%s\n' "$LEAK_TERMS" > /tmp/leak-terms
+            python3 scripts/check-skills.py --terms /tmp/leak-terms
+            rm -f /tmp/leak-terms
+          else
+            python3 scripts/check-skills.py
+          fi
+
+      - name: Validate contract schema is valid JSON Schema
+        run: |
+          python3 -m pip install --quiet 'jsonschema==4.23.0' 'pyyaml==6.0.2'
+          python3 - <<'PY'
+          import json
+          from jsonschema import Draft202012Validator
+          schema = json.load(open("schema/conventions.schema.json"))
+          Draft202012Validator.check_schema(schema)
+          print("schema is a valid JSON Schema")
+          PY
+
+      - name: Validate example contracts against the schema
+        run: |
+          python3 - <<'PY'
+          import json, glob, sys
+          import yaml
+          from jsonschema import Draft202012Validator
+          schema = json.load(open("schema/conventions.schema.json"))
+          v = Draft202012Validator(schema)
+          failed = False
+          for path in sorted(glob.glob("examples/*.yml")):
+              doc = yaml.safe_load(open(path))
+              errors = sorted(v.iter_errors(doc), key=lambda e: list(e.path))
+              if errors:
+                  failed = True
+                  print(f"{path}: {len(errors)} error(s)")
+                  for e in errors:
+                      loc = "/".join(map(str, e.path)) or "<root>"
+                      print(f"  at {loc}: {e.message}")
+              else:
+                  print(f"{path}: valid")
+          sys.exit(1 if failed else 0)
+          PY
+
+      - name: Verify canonical doc is a symlink, not a copy
+        run: |
+          # Two files that must agree cannot be allowed to drift. The only
+          # reliable way to guarantee that is for there to be one file.
+          test -L CLAUDE.md || { echo "CLAUDE.md must be a symlink to AGENTS.md"; exit 1; }
+          test "$(readlink CLAUDE.md)" = "AGENTS.md" || { echo "CLAUDE.md points at the wrong target"; exit 1; }
+          echo "CLAUDE.md -> AGENTS.md"
+
+      # An install command that references a name no manifest declares fails
+      # only at install time, for the user, after publication. Five separate
+      # files have to agree on the name and version; nothing but this step
+      # checks that they do. The list is exhaustive on purpose -- a sixth
+      # harness manifest added later and left out of it is the exact drift
+      # this step exists to catch, so ALL_MANIFESTS is the single place to
+      # register one.
+      - name: Validate plugin manifests agree
+        run: |
+          python3 - <<'PY'
+          import json, re, sys
+          problems = []
+
+          # every manifest that carries name+version, and whether it must
+          # also declare a skills root (the harness plugin manifests do;
+          # the gemini extension points at a context file instead).
+          ALL_MANIFESTS = [
+              (".claude-plugin/plugin.json", True),
+              (".cursor-plugin/plugin.json", True),
+              (".codex-plugin/plugin.json", True),
+              ("package.json", True),
+              ("gemini-extension.json", False),
+          ]
+
+          loaded = {}
+          for path, needs_skills in ALL_MANIFESTS:
+              try:
+                  loaded[path] = json.load(open(path))
+              except FileNotFoundError:
+                  problems.append(f"{path}: registered in ALL_MANIFESTS but missing from the repo")
+                  continue
+              d = loaded[path]
+              if needs_skills and not d.get("skills"):
+                  problems.append(f"{path}: missing 'skills' key")
+              if not d.get("name"):
+                  problems.append(f"{path}: missing 'name'")
+              elif not re.fullmatch(r"[a-z0-9]+(-[a-z0-9]+)*", d["name"]):
+                  problems.append(f"{path}: name '{d['name']}' is not kebab-case")
+              if not re.fullmatch(r"\d+\.\d+\.\d+", str(d.get("version", ""))):
+                  problems.append(f"{path}: version is not semver")
+
+          claude = loaded.get(".claude-plugin/plugin.json", {})
+          market = json.load(open(".claude-plugin/marketplace.json"))
+
+          # every manifest must agree with the claude one, which is canonical.
+          for path, _ in ALL_MANIFESTS:
+              d = loaded.get(path)
+              if d is None or path == ".claude-plugin/plugin.json":
+                  continue
+              if d.get("name") != claude.get("name"):
+                  problems.append(f"{path}: name '{d.get('name')}' != canonical '{claude.get('name')}'")
+              if d.get("version") != claude.get("version"):
+                  problems.append(f"{path}: version '{d.get('version')}' != canonical '{claude.get('version')}'")
+
+          # a published plugin with no attribution is a support burden, and the
+          # official validator warns on it -- fail here instead of shipping it.
+          for path in (".claude-plugin/plugin.json", ".cursor-plugin/plugin.json",
+                       ".codex-plugin/plugin.json", "package.json"):
+              d = loaded.get(path)
+              if d is not None and not d.get("author"):
+                  problems.append(f"{path}: missing 'author'")
+          if not market.get("description"):
+              problems.append("marketplace.json: missing 'description'")
+
+          for key in ("name", "owner", "plugins"):
+              if not market.get(key):
+                  problems.append(f"marketplace.json: missing '{key}'")
+          if not market.get("owner", {}).get("name"):
+              problems.append("marketplace.json: missing owner.name")
+
+          entries = market.get("plugins") or []
+          if len(entries) != 1:
+              problems.append(f"marketplace.json: expected 1 plugin entry, found {len(entries)}")
+          else:
+              entry = entries[0]
+              if not entry.get("source"):
+                  problems.append("marketplace.json: plugin entry missing 'source'")
+              if entry.get("name") != claude.get("name"):
+                  problems.append(
+                      f"marketplace entry '{entry.get('name')}' != plugin name '{claude.get('name')}'"
+                  )
+              if entry.get("version") != claude.get("version"):
+                  problems.append("marketplace entry version != plugin version")
+
+          # The README is what users copy from. If it names a marketplace or
+          # plugin the manifests do not declare, every install fails.
+          readme = open("README.md").read()
+          expected_install = f"/plugin install {claude['name']}@{market['name']}"
+          if expected_install not in readme:
+              problems.append(f"README missing install line: {expected_install}")
+
+          if problems:
+              for p in problems:
+                  print(f"  {p}")
+              sys.exit(1)
+          print(f"manifests agree: {claude['name']} v{claude['version']}")
+          PY

@@ -1,0 +1,15 @@
+{
+  "name": "dbt-navigator",
+  "displayName": "dbt Navigator",
+  "description": "dbt agent skills for the full development lifecycle — orient, decide, build, prove, ship. Reads your conventions from a contract file you own rather than imposing a fixed taxonomy.",
+  "version": "0.1.0",
+  "author": {
+    "name": "Yash Shah",
+    "url": "https://github.com/yshah-1108"
+  },
+  "homepage": "https://github.com/yshah-1108/dbt-navigator",
+  "repository": "https://github.com/yshah-1108/dbt-navigator",
+  "license": "MIT",
+  "keywords": ["dbt", "analytics-engineering", "sql", "data-engineering", "agent-skills", "skills"],
+  "skills": "./skills/"
+}

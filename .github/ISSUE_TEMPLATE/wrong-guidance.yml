@@ -1,0 +1,89 @@
+name: Wrong or dangerous guidance
+description: A skill told an agent to do something incorrect, unsafe, or that lost data
+title: "[guidance] "
+labels: ["guidance", "bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This is the highest-value issue type for this project. Guidance that is
+        confidently wrong is worse than missing guidance, because an agent acts
+        on it without hesitating.
+
+        If data was exposed or a credential leaked, do not file here — use
+        [private reporting](https://github.com/yshah-1108/dbt-navigator/security/advisories/new).
+
+  - type: input
+    id: skill
+    attributes:
+      label: Which skill
+      description: Path or name, plus a line number if you have one.
+      placeholder: skills/dbt-incremental-models/boundary-patterns.md:72
+    validations:
+      required: true
+
+  - type: textarea
+    id: guidance
+    attributes:
+      label: What it says
+      description: Quote the passage.
+    validations:
+      required: true
+
+  - type: textarea
+    id: outcome
+    attributes:
+      label: What happened when an agent followed it
+      description: |
+        The concrete consequence. Duplicated rows, dropped history, a failed
+        build, a wrong number, a query that cost far more than expected.
+    validations:
+      required: true
+
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence
+      description: |
+        A row count, an error, a query plan, compiled SQL, or a link to
+        documentation that contradicts the guidance. This project asks agents to
+        measure rather than assert and holds its own guidance to the same
+        standard.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: warehouse
+    attributes:
+      label: Warehouse
+      description: |
+        Much of the guidance here is dialect-gated. Advice that is right on one
+        engine can be wrong or silently different on another.
+      options:
+        - Snowflake
+        - BigQuery
+        - Databricks
+        - Redshift
+        - Postgres
+        - DuckDB
+        - Trino
+        - Other
+        - Not warehouse-specific
+    validations:
+      required: true
+
+  - type: input
+    id: dbt-version
+    attributes:
+      label: dbt version
+      placeholder: "1.9.2"
+
+  - type: textarea
+    id: contract
+    attributes:
+      label: Relevant part of your conventions.yml
+      description: |
+        Optional, and please redact anything internal. Useful when the guidance
+        may have been correct generically but wrong given your contract — that
+        distinction usually determines the fix.
+      render: yaml

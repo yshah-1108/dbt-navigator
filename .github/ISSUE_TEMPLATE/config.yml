@@ -1,0 +1,11 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Security or leaked-identifier report
+    url: https://github.com/yshah-1108/dbt-navigator/security/advisories/new
+    about: Report privately — never in a public issue. Includes any credential, internal hostname, or private identifier found in the files or in git history.
+  - name: dbt Labs' own agent skills
+    url: https://github.com/dbt-labs/dbt-agent-skills
+    about: For the semantic layer, dbt Mesh, MCP setup, the dbt platform, or Fusion migration. Their library and this one are complementary — install both.
+  - name: dbt documentation
+    url: https://docs.getdbt.com
+    about: For questions about how dbt itself behaves, rather than about this library's guidance.

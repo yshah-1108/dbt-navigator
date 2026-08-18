@@ -1,0 +1,42 @@
+{
+  "name": "dbt-navigator",
+  "version": "0.1.0",
+  "description": "dbt agent skills for the full development lifecycle — orient, decide, build, prove, ship. Reads your conventions from a contract file you own rather than imposing a fixed taxonomy.",
+  "keywords": [
+    "dbt",
+    "analytics-engineering",
+    "sql",
+    "data-engineering",
+    "agent-skills",
+    "skills",
+    "claude-code",
+    "cursor"
+  ],
+  "homepage": "https://github.com/yshah-1108/dbt-navigator",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yshah-1108/dbt-navigator.git"
+  },
+  "bugs": {
+    "url": "https://github.com/yshah-1108/dbt-navigator/issues"
+  },
+  "license": "MIT",
+  "author": {
+    "name": "Yash Shah",
+    "url": "https://github.com/yshah-1108"
+  },
+  "private": false,
+  "files": [
+    "skills/",
+    "agents/",
+    "schema/",
+    "examples/",
+    "AGENTS.md",
+    "README.md",
+    "LICENSE"
+  ],
+  "skills": "./skills/",
+  "scripts": {
+    "check": "python3 scripts/check-skills.py"
+  }
+}

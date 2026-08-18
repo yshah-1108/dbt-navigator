@@ -1,0 +1,6 @@
+{
+  "name": "dbt-navigator",
+  "version": "0.1.0",
+  "description": "dbt agent skills for the full development lifecycle — orient, decide, build, prove, ship. Reads your conventions from a contract file you own rather than imposing a fixed taxonomy.",
+  "contextFileName": "GEMINI.md"
+}

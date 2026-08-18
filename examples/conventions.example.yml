@@ -1,0 +1,180 @@
+# Example conventions contract — a fictional project, filled in.
+#
+# Values here are illustrative, not prescriptive. They show the SHAPE of a
+# complete contract and the kind of comment worth leaving behind. Every value
+# in a real contract should be DERIVED from your repository by the commands in
+# skills/dbt-project-conventions/inferring-conventions.md, then confirmed.
+#
+# Copy to your project root as `conventions.yml` and replace everything.
+# Delete any section you do not have a convention for -- absent fields make
+# skills fall back to generic guidance rather than enforcing someone else's
+# rules. A half-filled honest contract beats a complete invented one.
+
+version: 1
+
+# When this contract was last checked against the repository. A reader weighs
+# the contract by this date; observed reality still wins on any conflict.
+# Quoted deliberately: unquoted, YAML parses this into a date object, which
+# fails schema validation expecting a string.
+verified_at: "2026-01-15"
+
+# Known, accepted departures. An entry here means: we know, it is intentional,
+# stop reporting it. Without this, every grandfathered model looks like a fresh
+# violation and the same names get re-litigated every session.
+deviations:
+  - pattern: "tbl_*"
+    reason: Legacy prefix, predates the current taxonomy. Not renamed because a rename breaks every downstream ref() and BI reference.
+  - pattern: models/marts/<domain>/<model_name>.sql
+    reason: Wide denormalized table kept for a BI tool that cannot join efficiently.
+    expires: "2026-12-31"
+
+# Where the knowledge no tool can derive lives. Skills read these before
+# asking you a question. Record only what a tool CANNOT compute -- a copy of
+# a derivable fact just goes stale while the real answer moves on.
+context:
+  domain_notes: .dbt-agent/domain.md
+  # Bespoke machinery a general skill cannot know exists: a mandated macro for
+  # limiting data in dev, custom environment detection, an overridden dbt
+  # built-in, generated exposures, CI checks. Record a mechanism only where a
+  # skill's sensible default would be WRONG here -- restating advice the skill
+  # already gives just creates a copy that drifts.
+  mechanisms: .dbt-agent/mechanisms.md
+  references: .dbt-agent/references.md
+  # Names of YOUR meta keys. The contract says where to look; the values live
+  # in dbt `meta` next to each model, so they ship to the catalog.
+  meta_keys:
+    sla: sla_hours
+    criticality: criticality
+    owner: owning_team
+
+project:
+  dbt_project_name: jaffle_analytics
+  warehouse: snowflake
+  timezone: America/Los_Angeles
+  # Cache of `dbt --version`. Several skills gate advice on a minimum version.
+  # Refresh on upgrade -- this one rots detectably, since dbt contradicts it.
+  dbt_version: "1.9.2"
+  # The only instrument that sees consumers who are in no catalog and no
+  # exposure. Leave unset if nobody has access: unset means "this evidence is
+  # unavailable", which is a different finding from "no reads were found".
+  query_history_relation: snowflake.account_usage.query_history
+  # What makes "no reads in 30 days" defensible rather than misleading.
+  query_history_retention_days: 365
+
+orchestrator:
+  # Schedules are deliberately NOT recorded here -- a stale cron reads as
+  # authoritative and is worse than no cron at all.
+  type: airflow
+  config_path: dags/
+
+sensitivity:
+  # Where this project records that a column holds personal or regulated data.
+  # Absent this section, an agent cannot tell an unclassified column from a
+  # project that classifies nothing, and must ask every single time.
+  meta_key: classification
+  levels: ["public", "internal", "confidential", "restricted"]
+  # Classify at the boundary where the obligation is still cheap to resolve.
+  required_on_new_columns_in: ["staging"]
+  # The warehouse enforces; the YAML records. A YAML claim the warehouse does
+  # not back is the dangerous direction of drift -- it reads as a guarantee.
+  warehouse_policy_is_authoritative: true
+
+environments:
+  dev:
+    database: dw_dev
+    schema: dbt_<username>
+    role: <username>_role
+  prod:
+    database: dw_prod
+    schema: analytics
+  detection:
+    # Measured: this project uses database-name detection, not target.name.
+    # A target can be renamed per developer; a database name cannot.
+    strategy: database_name
+    expression: "target.database | lower == 'dw_dev'"
+
+# Illustrative measured prefix distribution across 480 models:
+#   stg_ 260 · dim_ 70 · int_ 60 · fct_ 55 · tbl_ 35
+# 445 of 480 (93%) match the taxonomy below.
+layers:
+  - name: staging
+    path: models/staging
+    prefixes: ["stg_"]
+    materialization: view
+    may_reference: []          # sources only
+  - name: intermediate
+    path: models/intermediate
+    prefixes: ["int_"]
+    materialization: mixed     # view, or incremental when volume demands
+    may_reference: ["staging", "intermediate", "marts_dimensions"]
+  - name: marts_dimensions
+    path: models/marts
+    prefixes: ["dim_"]
+    materialization: table
+    may_reference: ["staging", "intermediate", "marts_dimensions"]
+  - name: marts_reports
+    path: models/marts
+    prefixes: ["fct_"]
+    materialization: incremental
+    terminal: true             # nothing may ref() these
+    # Ceiling on sensitivity: a column classified above this appearing here is
+    # a defect, checkable without inspecting a single grant or masking policy.
+    max_classification: internal
+    may_reference: ["staging", "intermediate", "marts_dimensions"]
+
+naming:
+  model_pattern: "<prefix><source_or_domain>__<entity>[_<grain>][_<timezone>]"
+  separator: "__"            # measured: 370/480 models (77%)
+  # NOT inferable -- a deprecated prefix looks identical to a current one in a
+  # filename. Stated explicitly by the team. 35 existing models still use these
+  # and are grandfathered; the rule applies to NEW models only.
+  banned_prefixes: ["tbl_", "vw_"]
+  timestamp_column_suffix: "_utc"
+  surrogate_key_column: row_key     # measured: 18 of 22 surrogate keys
+  yaml_file_pattern: "_<model_name>.yml"
+
+schedules:
+  # Set globally in dbt_project.yml. Agents must NOT add this tag to individual
+  # models -- doing so is redundant and obscures which models are genuinely
+  # non-default.
+  default_tag: daily
+  tags:
+    - tag: early_daily
+      cadence: daily, ahead of the main daily window
+    - tag: hourly
+      cadence: hourly
+    - tag: every_6h
+      cadence: every 6 hours
+    - tag: quarterly
+      cadence: quarterly
+  # Authoritative crons live in the orchestrator. Deliberately not copied here:
+  # a hand-maintained duplicate of live scheduling state rots silently and is
+  # worse than no answer.
+
+testing:
+  primary_key: ["unique", "not_null"]
+  # Custom generic tests scoped to a recent window. Name yours whatever your
+  # project calls them -- these are illustrative. They exist because
+  # full-history uniqueness on a large incremental model is too expensive to
+  # run on every build, so the check is narrowed to the window that just
+  # changed rather than dropped entirely.
+  primary_key_incremental: ["unique_in_window", "not_null_in_window"]
+  foreign_key: ["not_null", "relationships"]
+  foreign_key_severity: warn
+
+bi:
+  # Whether this project declares downstream consumers as dbt exposures.
+  # When true, a new terminal model without an exposure is an omission.
+  use_exposures: true
+  consumers:
+    - tool: mode
+      repo_path: ../bi-definitions
+      status: primary
+    - tool: tableau
+      status: legacy
+
+sql_style:
+  allowed_join_types: ["inner", "left"]
+  group_by_style: all        # requires Snowflake/BigQuery/Databricks/DuckDB
+  keyword_case: lower
+  final_cte_name: final

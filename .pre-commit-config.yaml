@@ -1,0 +1,45 @@
+# Uses the pre-commit framework rather than a hand-rolled .githooks script,
+# because core.hooksPath must be set manually -- so fresh clones and CI get
+# zero coverage from the hand-rolled approach.
+#
+# Enable once:  pip install pre-commit && pre-commit install
+repos:
+  - repo: local
+    hooks:
+      - id: check-skills
+        name: skill content and structure
+        entry: python3 scripts/check-skills.py
+        language: system
+        pass_filenames: false
+        # Every path the checker actually validates has to be listed here, or an
+        # edit to it silently skips the gate. `examples/` and `agents/` were
+        # previously omitted despite both being validated -- and `examples/` is
+        # the directory that once carried a leaked taxonomy precisely because
+        # nothing scanned it.
+        files: >
+          (?x)^(
+            skills/
+            |schema/
+            |docs/
+            |agents/
+            |examples/
+            |scripts/
+            |\.claude-plugin/
+            |\.cursor-plugin/
+            |\.codex-plugin/
+            |README\.md
+            |AGENTS\.md
+            |CONTRIBUTING\.md
+            |package\.json
+            |gemini-extension\.json
+          )
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-json
+      - id: check-yaml
+      - id: check-merge-conflict
+      - id: check-symlinks

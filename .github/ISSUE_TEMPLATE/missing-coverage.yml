@@ -1,0 +1,61 @@
+name: Missing coverage
+description: A real dbt task the library does not cover, or covers too thinly to act on
+title: "[coverage] "
+labels: ["coverage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        The skill set is meant to grow by measurement rather than by guessing —
+        the two largest additions so far came from counting a year of merged PRs
+        and from auditing against dbt's own documentation. So the most useful
+        thing you can include is evidence that the task is common.
+
+  - type: textarea
+    id: task
+    attributes:
+      label: The task
+      description: |
+        Phrase it as the thing an engineer is doing, not as a topic. "Splitting a
+        model that two teams now need differently", not "model design".
+    validations:
+      required: true
+
+  - type: textarea
+    id: current
+    attributes:
+      label: What happens today
+      description: |
+        Which skill an agent currently lands on, and where it runs out. "No skill
+        matches" is a complete answer.
+    validations:
+      required: true
+
+  - type: textarea
+    id: frequency
+    attributes:
+      label: How often does this come up?
+      description: |
+        A count beats a hunch. A grep of your merged PRs, a number of affected
+        models, or how many times your team hit it this quarter. If it is rare
+        but expensive when it happens, say that instead — that is also a good
+        reason.
+    validations:
+      required: true
+
+  - type: textarea
+    id: failure
+    attributes:
+      label: What goes wrong without guidance
+      description: |
+        Guidance earns its place by preventing a specific failure. Which one?
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: checked
+    attributes:
+      label: Before filing
+      options:
+        - label: I checked `dbt-navigating-skills` and no archetype routes this task
+        - label: This is not already covered by a sub-document of an existing skill

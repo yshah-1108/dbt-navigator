@@ -1,0 +1,60 @@
+name: Portability problem
+description: Guidance that assumes one warehouse, one harness, or one project's conventions
+title: "[portability] "
+labels: ["portability"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        The central claim of this library is that the enforcement logic is
+        separate from the values — so the same skills fit a project whose layers
+        are `stg/int/mart`, `bronze/silver/gold`, or something bespoke. Every
+        place that claim fails is worth fixing, and reports like this are how the
+        remaining ones get found.
+
+  - type: dropdown
+    id: kind
+    attributes:
+      label: What kind of assumption
+      options:
+        - Hardcoded convention — a prefix, suffix, or column name not read from the contract
+        - Warehouse-specific syntax presented as generic dbt advice
+        - Harness-specific instruction that will not work elsewhere
+        - Industry- or domain-specific example that reads as irrelevant
+        - An organisation-specific identifier that should have been genericized
+    validations:
+      required: true
+
+  - type: input
+    id: location
+    attributes:
+      label: Where
+      placeholder: skills/dbt-authoring-sql-models/staging.md:41
+    validations:
+      required: true
+
+  - type: textarea
+    id: quote
+    attributes:
+      label: The passage
+    validations:
+      required: true
+
+  - type: textarea
+    id: breaks
+    attributes:
+      label: How it fails for you
+      description: |
+        What your project or warehouse does differently, and what the guidance
+        would have produced. If it caused a real error, include it.
+    validations:
+      required: true
+
+  - type: textarea
+    id: fix
+    attributes:
+      label: Which contract field should it read?
+      description: |
+        Optional. If the value belongs in `conventions.yml`, name the field — an
+        existing one, or one you think should exist. If it should instead be
+        gated on `project.warehouse`, say that.

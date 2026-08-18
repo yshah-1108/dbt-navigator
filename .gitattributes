@@ -1,0 +1,23 @@
+# Normalise line endings so a checkout on Windows does not rewrite every file
+# and make the whole library look modified.
+* text=auto eol=lf
+
+# The tracked symlink. Git stores it as mode 120000; marking it explicitly stops
+# a filter or a platform without symlink support from silently turning it into a
+# text file containing the word "AGENTS.md", which would make CLAUDE.md a stale
+# copy of the rules -- the exact drift the symlink exists to prevent.
+CLAUDE.md symlink
+
+# Executable, and must stay that way: the skills invoke these directly.
+*.sh text eol=lf
+scripts/*.py text eol=lf
+
+# Keep documentation diffs readable in review.
+*.md text diff=markdown
+
+# Exclude repo scaffolding from the release archive and from GitHub's language
+# statistics, so the repo reads as what it is: a documentation library.
+.github/ export-ignore
+.pre-commit-config.yaml export-ignore
+docs/*.md linguist-documentation
+skills/**/*.md linguist-documentation

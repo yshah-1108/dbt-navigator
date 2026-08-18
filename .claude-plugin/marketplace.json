@@ -1,0 +1,16 @@
+{
+  "name": "dbt-navigator-marketplace",
+  "description": "Agent skills for working in dbt projects across the full development lifecycle.",
+  "owner": {
+    "name": "yshah-1108",
+    "url": "https://github.com/yshah-1108/dbt-navigator"
+  },
+  "plugins": [
+    {
+      "name": "dbt-navigator",
+      "source": "./",
+      "description": "dbt agent skills for the full development lifecycle — orient, decide, build, prove, ship. Reads your conventions from a contract file you own rather than imposing a fixed taxonomy.",
+      "version": "0.1.0"
+    }
+  ]
+}

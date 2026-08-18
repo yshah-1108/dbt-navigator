@@ -1,0 +1,19 @@
+{
+  "name": "dbt-navigator",
+  "version": "0.1.0",
+  "description": "dbt agent skills for the full development lifecycle — orient, decide, build, prove, ship. Reads your conventions from a contract file you own rather than imposing a fixed taxonomy.",
+  "license": "MIT",
+  "author": {
+    "name": "Yash Shah",
+    "url": "https://github.com/yshah-1108"
+  },
+  "homepage": "https://github.com/yshah-1108/dbt-navigator",
+  "repository": "https://github.com/yshah-1108/dbt-navigator",
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "dbt Navigator",
+    "shortDescription": "The full development lifecycle for a dbt coding agent.",
+    "longDescription": "27 skills covering the dbt development lifecycle — orient, decide, build, prove, ship — plus diagnostics. Reads your project's conventions from a contract file you own rather than imposing a fixed taxonomy, so the same skills fit a project whose layers are stg/int/mart, bronze/silver/gold, or something bespoke. Strongest on the operations no documentation covers: adding a column and propagating it, proving a refactor changed nothing, renaming safely when BI consumers exist, and backfilling without losing history.",
+    "category": "Data"
+  }
+}

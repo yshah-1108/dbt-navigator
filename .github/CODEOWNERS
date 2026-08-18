@@ -1,0 +1,7 @@
+# Every change is reviewed by the maintainer.
+#
+# This library's artifact is guidance that an agent acts on inside a repository
+# holding warehouse credentials. A wrong sentence here is not a cosmetic defect —
+# it is an instruction that gets followed. So there is no path that merges
+# without review.
+* @yshah-1108

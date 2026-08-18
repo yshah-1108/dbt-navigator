@@ -1,0 +1,344 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/yshah-1108/dbt-navigator/main/schema/conventions.schema.json",
+  "title": "dbt Agent Conventions Contract",
+  "description": "Machine-readable record of a dbt project's conventions. Skills read this file instead of hardcoding any single team's taxonomy. Every field is optional: a skill whose values are absent degrades to generic guidance rather than enforcing someone else's rules.",
+  "type": "object",
+  "properties": {
+    "version": {
+      "type": "integer",
+      "const": 1,
+      "description": "Contract schema version."
+    },
+    "verified_at": {
+      "type": "string",
+      "format": "date",
+      "description": "Date this contract was last checked against the repository, as YYYY-MM-DD. Distinct from `version`, which identifies the schema's shape rather than this file's freshness. Its purpose is to let a reader weigh the contract: one verified last week and one verified two years ago make identical claims with very different reliability, and with no date those are indistinguishable. Note the limit -- this is a hand-entered assertion, so it can be stale or simply never updated. Treat a distant date as a warning; never treat a recent one as proof a specific field is still true. Observed reality still wins on a conflict."
+    },
+    "deviations": {
+      "type": "array",
+      "description": "Known, accepted departures from the conventions declared below. Deviations are the normal state of a real taxonomy, and with nowhere to record them every grandfathered model is indistinguishable from a fresh violation -- so each session re-litigates the same handful of names, which is how teams learn to ignore a linter. An entry here means: we know, it is intentional, stop reporting it.",
+      "items": {
+        "type": "object",
+        "required": ["pattern"],
+        "properties": {
+          "pattern": {
+            "type": "string",
+            "description": "What the exception covers: a model name, a glob, or a prefix."
+          },
+          "reason": {
+            "type": "string",
+            "description": "Why it is accepted. An exception with no reason is indistinguishable from an oversight to the next reader."
+          },
+          "expires": {
+            "type": "string",
+            "format": "date",
+            "description": "Optional. Present means temporary debt with a review date; absent means permanently accepted. Distinguishing the two separates a decision from a thing nobody got round to."
+          }
+        }
+      }
+    },
+    "context": {
+      "type": "object",
+      "description": "Where this project keeps the knowledge no tool can derive. Skills consult these before asking a human. The organizing rule: record here only what a connected tool cannot compute -- decisions, policies, business meaning, tolerances. Anything derivable from the repo, the warehouse, the DAG or the orchestrator must not be duplicated here, because a copy of a derivable fact is a copy that goes stale while the real answer moves on. Prefer a dbt-native home when one exists (`description` for meaning, `exposures` for consumers, source `freshness` for source SLAs, `groups`/`owner` for ownership); these fields cover only what dbt has nowhere to put.",
+      "additionalProperties": false,
+      "properties": {
+    "domain_notes": {
+      "type": "string",
+      "description": "Path to a prose file holding business domain knowledge that has no structured home: what the company does, what the core entities mean, which of two rival metric definitions is canonical, and the traps that have caused incidents. This is the file that answers 'why is it done this way', which no amount of warehouse access will tell you."
+    },
+    "mechanisms": {
+      "type": "string",
+      "description": "Path to a prose file describing bespoke machinery and repeated patterns this project provides that a general skill cannot know exists: a mandated macro for limiting data in dev, a custom environment-detection macro, an overridden generate_schema_name or generate_alias_name, a blue/green deployment procedure, generated-rather-than-hand-written exposures, installed packages that resolve a skill's conditional recommendation, CI checks that change what is worth doing by hand, seeds used as config or lookup tables whose values must be read rather than inlined, and the project's own unnamed code-shape patterns -- the house dedup idiom, CTE structure, incremental-boundary shape, or union-of-sources shape that recurs across models but was never extracted into a macro. The inclusion test is narrow and worth applying strictly: record a mechanism only where a skill's sensible generic default would be WRONG here. A restatement of advice the skill already gives is not a mechanism -- it is a duplicate that will drift out of sync with the skill and be believed anyway. This is the highest-value context file for preventing an agent from hand-rolling something the project already solved, and the one most often missing, because its contents are invisible to a reader of the models alone -- an overridden dbt built-in appears in no model file at all, and a hand-copied idiom has no name to grep for."
+    },
+        "references": {
+          "type": "string",
+          "description": "Path to an index of external documents (runbooks, policies, specs, ERDs). An index, not a library: each entry states which question it answers, so an agent can decide whether fetching it is worth the tokens. Never paste the documents themselves into the repository."
+        },
+        "meta_keys": {
+          "type": "object",
+          "description": "Names of the `meta` keys this project uses to record must-ask answers on models. Follows the same pattern as `sensitivity.meta_key`: the contract declares *where* to look, while the value itself lives in dbt-native `meta` so it stays next to the model and ships to the catalog. Declaring a key here is what makes it discoverable; an agent cannot guess your key names.",
+          "additionalProperties": false,
+          "properties": {
+            "sla": {
+              "type": "string",
+              "description": "Meta key holding the freshness expectation for a model, e.g. `sla_hours`. Without this, 'is this table late?' is unanswerable -- lateness needs a declared expectation, and staleness alone is not lateness."
+            },
+            "criticality": {
+              "type": "string",
+              "description": "Meta key ranking how much a model matters, e.g. `criticality`. Without it every model looks equally important during triage, which means none of them do."
+            },
+            "owner": {
+              "type": "string",
+              "description": "Meta key naming the accountable team for a model. Distinct from git history, which records who typed, never who is accountable."
+            }
+          }
+        }
+      }
+    },
+    "project": {
+      "type": "object",
+      "description": "Identity used to construct tool-specific references.",
+      "properties": {
+        "dbt_project_name": {
+          "type": "string",
+          "description": "Name from dbt_project.yml. Used to build node unique_ids as model.<name>.<model>."
+        },
+        "warehouse": {
+          "type": "string",
+          "enum": ["snowflake", "bigquery", "databricks", "redshift", "postgres", "duckdb", "trino", "other"],
+          "description": "The dbt adapter, which is what decides whether a given piece of SQL is legal. Drives dialect-gated guidance -- for example `group by all` does not exist in Postgres and, on Trino, is valid syntax that groups differently than the auto-inference form found on Snowflake, BigQuery, Databricks, DuckDB, and Redshift. If the warehouse a team says they use ever disagrees with the adapter dbt actually runs, the adapter is the answer."
+        },
+        "timezone": {
+          "type": "string",
+          "description": "IANA timezone the project reasons in, e.g. UTC or Europe/London."
+        },
+        "dbt_version": {
+          "type": "string",
+          "description": "Resolved dbt core version, e.g. 1.9.2. A cache of a derivable fact, recorded so a session reads it instead of shelling out -- several skills gate advice on a minimum version. Refresh it on upgrade; unlike a cron it rots detectably, since `dbt --version` contradicts it immediately."
+        },
+        "query_history_relation": {
+          "type": "string",
+          "description": "Fully-qualified relation holding warehouse query logs, e.g. snowflake.account_usage.query_history. The query log is the only instrument that sees consumers who are in no catalog and no exposure, but its name is warehouse-specific, permission-gated, and sometimes absent entirely. Naming it here is what lets a dead-model claim or a blast-radius sweep run without rediscovering it per project. Leave unset if nobody has access -- unset means 'this evidence is unavailable', which is a different finding from 'no reads were found'."
+        },
+        "query_history_retention_days": {
+          "type": "integer",
+          "description": "How far back the query log actually retains. This is what makes 'no reads in 30 days' a defensible claim instead of a misleading one: a 7-day window cannot support a 30-day statement, and reporting one from the other is how a live model gets deleted."
+        }
+      }
+    },
+    "sensitivity": {
+      "type": "object",
+      "description": "How this project records that a column holds personal or regulated data. Without this section an agent cannot distinguish an unclassified column from a project that classifies nothing, so it must ask every time -- and the absence of a classification tag is never evidence that a column is safe.",
+      "properties": {
+        "meta_key": {
+          "type": "string",
+          "description": "The column-level `meta` key carrying the classification, e.g. `classification`. This is where the project's own record lives, independent of any warehouse policy."
+        },
+        "tag_namespace": {
+          "type": "string",
+          "description": "Prefix for classification tags, if the project uses tags rather than (or alongside) a meta key, e.g. `pii`."
+        },
+        "levels": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Permitted classification values in increasing order of sensitivity, e.g. [\"public\", \"internal\", \"confidential\", \"restricted\"]. Order matters: layers[].max_classification is interpreted against this ordering."
+        },
+        "required_on_new_columns_in": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Layer names where a new column must carry a classification. Usually the source-facing layer, since that is the boundary where an obligation can still be resolved cheaply."
+        },
+        "warehouse_policy_is_authoritative": {
+          "type": "boolean",
+          "description": "True if the warehouse's own masking or tagging is the source of truth and the YAML record is a convenience copy. When true, a YAML claim of protection that the warehouse does not enforce is the dangerous direction of drift -- it reads as a guarantee and is not one."
+        }
+      }
+    },
+    "orchestrator": {
+      "type": "object",
+      "description": "What runs this project in production. Deliberately does NOT record schedules -- crons drift and a stale cron here is worse than no cron, because it reads as authoritative. This records only enough to stop a discovery grep and to distinguish 'scheduling lives in a repository you cannot see' from 'nothing schedules this' -- two situations that look identical from inside the repo and have opposite implications.",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["dbt_platform", "airflow", "dagster", "github_actions", "gitlab_ci", "other", "none", "unknown"],
+          "description": "Set to `none` only if you have confirmed nothing runs this project on a schedule. Set to `unknown` if you have not checked, or if orchestration is defined outside this repository. Never infer `none` from the absence of config files in this repo."
+        },
+        "config_path": {
+          "type": "string",
+          "description": "Where orchestration is defined, if it lives in this repository. A path outside the repo, or a repo name, is more useful than nothing."
+        }
+      }
+    },
+    "environments": {
+      "type": "object",
+      "description": "How the agent tells dev from prod. Getting this wrong is how an agent runs a dev command against production.",
+      "properties": {
+        "dev": {
+          "$ref": "#/$defs/environment"
+        },
+        "prod": {
+          "$ref": "#/$defs/environment"
+        },
+        "detection": {
+          "type": "object",
+          "description": "The expression that identifies dev at runtime.",
+          "properties": {
+            "strategy": {
+              "type": "string",
+              "enum": ["database_name", "schema_name", "target_name", "env_var", "macro"],
+              "description": "Prefer database_name or schema_name. target_name is fragile because a target can be renamed per developer. Use `macro` when the project wraps detection in its own macro -- the right answer whenever the real condition is compound (for example, a dev database OR a production database with a non-production schema, which is what a CI pull-request build looks like). A compound condition copied inline into each model is a condition that will eventually be copied wrongly, so where a macro exists it is the only correct citation."
+            },
+            "expression": {
+              "type": "string",
+              "description": "The literal Jinja to use, e.g. target.database | lower == '<dev_database>'. With strategy `macro`, put the call here (e.g. `is_dev_or_ci()`) and NOT the logic it wraps: an inline copy of a compound condition silently misclassifies the cases it omits, and a build misclassified as production is the expensive direction of that mistake."
+            }
+          }
+        }
+      }
+    },
+    "layers": {
+      "type": "array",
+      "description": "The project's DAG layers in dependency order, with the prefixes and materializations each uses.",
+      "items": {
+        "type": "object",
+        "required": ["name"],
+        "properties": {
+          "name": { "type": "string", "description": "Layer name, e.g. staging." },
+          "path": { "type": "string", "description": "Glob root, e.g. models/staging." },
+          "prefixes": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Model-name prefixes belonging to this layer, e.g. [\"stg_\"]."
+          },
+          "materialization": {
+            "type": "string",
+            "enum": ["view", "table", "incremental", "ephemeral", "materialized_view", "mixed"]
+          },
+          "terminal": {
+            "type": "boolean",
+            "description": "True if nothing downstream may ref() these models. Report marts are typically terminal."
+          },
+          "max_classification": {
+            "type": "string",
+            "description": "Highest sensitivity level (from sensitivity.levels) that may appear in this layer. This is the one field that makes sensitive-column sprawl mechanically checkable instead of dependent on someone choosing to look: a column classified above this level appearing here is a defect regardless of whether any grant or masking policy is currently correct. Omit if the project places no ceiling on a layer."
+          },
+          "may_reference": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Layer names this layer is allowed to reference. Encodes the no-layer-skipping rule without assuming a specific architecture."
+          }
+        }
+      }
+    },
+    "naming": {
+      "type": "object",
+      "description": "The taxonomy. This is the field that makes naming guidance portable: the skill supplies enforcement, this supplies the values.",
+      "properties": {
+        "model_pattern": {
+          "type": "string",
+          "description": "Human-readable format string, e.g. <prefix><source_or_domain>__<entity>[_<grain>][_<timezone>]."
+        },
+        "separator": {
+          "type": "string",
+          "default": "__",
+          "description": "Token separating the source/domain segment from the entity segment."
+        },
+        "banned_prefixes": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Deprecated prefixes disallowed on NEW models. Cannot be inferred -- legacy prefixes look identical to current ones -- so this must be stated explicitly."
+        },
+        "timestamp_column_suffix": {
+          "type": "string",
+          "description": "Required suffix on timestamp/date columns, e.g. _utc. Applies to columns, not model names."
+        },
+        "surrogate_key_column": {
+          "type": "string",
+          "description": "Conventional name for a generated surrogate key, e.g. unique_id."
+        },
+        "yaml_file_pattern": {
+          "type": "string",
+          "description": "How schema YAML files are named relative to their model, e.g. _<model_name>.yml."
+        }
+      }
+    },
+    "schedules": {
+      "type": "object",
+      "description": "Orchestration cadence tags. Prefer deriving actual crons from the orchestrator API rather than restating them here, since a hand-maintained copy of live state silently rots.",
+      "properties": {
+        "default_tag": {
+          "type": "string",
+          "description": "Tag applied globally in dbt_project.yml. Agents must NOT add this to individual models."
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["tag"],
+            "properties": {
+              "tag": { "type": "string" },
+              "cadence": { "type": "string", "description": "Human description, e.g. every 6 hours." },
+              "cron": { "type": "string", "description": "Optional. Authoritative source is the orchestrator." }
+            }
+          }
+        }
+      }
+    },
+    "testing": {
+      "type": "object",
+      "description": "Which tests are expected on which kind of column. Lets the testing skill make concrete recommendations without imposing one team's policy.",
+      "properties": {
+        "primary_key": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Tests expected on a PK, e.g. [\"unique\", \"not_null\"]."
+        },
+        "primary_key_incremental": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Override for incremental models, where scanning full history each run is often too expensive."
+        },
+        "foreign_key": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "foreign_key_severity": {
+          "type": "string",
+          "enum": ["warn", "error"]
+        }
+      }
+    },
+    "bi": {
+      "type": "object",
+      "description": "Downstream BI consumers to check before renaming or removing a column.",
+      "properties": {
+        "consumers": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "tool": { "type": "string", "enum": ["looker", "omni", "tableau", "powerbi", "mode", "other"] },
+              "repo_path": { "type": "string", "description": "Local path or git URL to grep for column references." },
+              "status": { "type": "string", "enum": ["primary", "legacy", "deprecated"] }
+            }
+          }
+        },
+        "use_exposures": {
+          "type": "boolean",
+          "description": "Whether this project declares dbt exposures for BI consumers. When true, blast-radius tracing should include `dbt ls --select <model>+ --resource-type exposure`. Exposure coverage is only ever as complete as what someone chose to declare, so a clean exposure result is never on its own proof of no consumers."
+        }
+      }
+    },
+    "sql_style": {
+      "type": "object",
+      "description": "Style rules that are genuinely contested between teams. Anything universally true is stated in the skills themselves rather than made configurable.",
+      "properties": {
+        "allowed_join_types": {
+          "type": "array",
+          "items": { "type": "string", "enum": ["inner", "left", "right", "full", "cross"] }
+        },
+        "group_by_style": {
+          "type": "string",
+          "enum": ["all", "explicit_columns", "positional"],
+          "description": "`all` requires Snowflake, BigQuery, Databricks or DuckDB."
+        },
+        "keyword_case": { "type": "string", "enum": ["lower", "upper"] },
+        "final_cte_name": {
+          "type": "string",
+          "description": "Name of the terminal CTE, e.g. final. Used by guidance about where select * is acceptable."
+        }
+      }
+    }
+  },
+  "$defs": {
+    "environment": {
+      "type": "object",
+      "properties": {
+        "database": { "type": "string" },
+        "schema": { "type": "string", "description": "May contain <username> as a placeholder for per-developer schemas." },
+        "role": { "type": "string" }
+      }
+    }
+  }
+}
