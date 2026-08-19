@@ -380,6 +380,8 @@ And a defect is the likelier explanation when:
 
 Two things not to do here. Do not set a threshold to make an alert stop firing before knowing whether the underlying move was real — that converts an unanswered question into a permanently unaskable one. And do not describe an unresolved question as a resolved one: "appears to be a genuine business change, unconfirmed" is a legitimate finding; "expected variance" stated without confirmation is a guess wearing a conclusion's clothes.
 
+**Before escalating a cross-system discrepancy, check whether it is expected.** Two systems' counts of the "same" entity routinely differ by design — a CRM counting signed contracts against a product database counting logins have never matched and are not supposed to — and `context.domain_notes` is where a project records that, if it mapped its entities. A discrepancy that turns out to be definitional is not a data-quality incident, and reporting it as one costs credibility you will want for a real one. Absence of a note is not evidence the gap is a bug; it means nobody wrote it down, so it is still a question.
+
 ## Communicating a data incident
 
 Distinct from diagnosing it, and the part with consequences outside the repo. Two failures dominate: telling nobody, and telling everybody a wall of technical detail they cannot act on.

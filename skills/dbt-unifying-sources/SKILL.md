@@ -137,6 +137,8 @@ Getting this backwards is the single most expensive error in this skill. Union s
 
 **Ask: if source A and source B both have data for the same entity on the same day, is that the same row or two different rows?** Same row → join. Different rows → union.
 
+That question, and the "partially the same rows" case above, are answered by the business map rather than by any query — whether one population is a subset of the other or the two only overlap, and whether a match rate well under 100% is expected. If the project keeps `context.domain_notes`, its entity-links section should already state both; if not, `dbt-onboarding-to-a-project/mapping-the-business.md` is the procedure for establishing them. Do that before choosing the shape, not after: the measurement tells you the rate, and only a person tells you whether that rate is normal.
+
 ### The question has a third answer, and it is common
 
 "I don't know — sometimes the same, sometimes different." That is not indecision, it is the description of an **overlap**, and it means the sources partially cover the same events. Neither shape is correct on its own: a union double-counts the shared events and a join drops the unshared ones.

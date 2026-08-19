@@ -4,6 +4,8 @@ An exposure declares a downstream consumer — a dashboard, a report, a notebook
 
 Read `bi.use_exposures` from the contract. If it is `true`, the project has committed to declaring consumers and a new terminal model without an exposure is an omission. If it is `false` or absent, exposures may still be worth introducing, but do not retrofit the whole project as a side effect of an unrelated task.
 
+**Check whether this project generates its exposures before hand-writing one.** Some teams emit exposures from BI metadata in CI rather than maintaining them by hand, and where that is true a hand-added exposure is reverted by the next run — the work disappears and the reason is invisible in the diff. The tell is a CI workflow that writes into `models/` and commits, or a generated-artifact note in `context.mechanisms`; `dbt-onboarding-to-a-project` §5 classifies workflows for exactly this. If exposures are generated, the fix for a missing one is in the generator or its upstream BI metadata, not in the YAML.
+
 ## Why this matters more than it looks
 
 Six of the skills in this library ask "who consumes this model?" before allowing a change:
