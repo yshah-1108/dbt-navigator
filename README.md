@@ -90,6 +90,8 @@ The agent measures your repo — prefix distribution, separator, materialization
 
 It also does two things a taxonomy pass alone does not. It finds the **bespoke machinery** your project already has, so an agent stops hand-rolling what you solved years ago — including overridden dbt built-ins, which appear in no model file because dbt calls them automatically. And it **appraises** what it finds: each practice is recorded as best practice, a deliberate variant that works better here, or a candidate defect. Findings are reported, not silently corrected.
 
+**Treat the result as a first pass, and plan to iterate.** Your project's conventions and business meaning are years of accumulated decisions; one session derives a useful fraction of them from the outside, not all of them. Expect some entries to be assumptions that read like facts — which is why inferences are marked and open questions are listed rather than filled in. **Review it as a document about your team**, correct what is wrong, and answer the questions. The business sections in particular (which systems are the system of record, what your central marts are for) will mostly come back as questions on a first run, and answering them is the highest-value hour you spend here. Run the pass again as the project changes; the second pass is normal, not a sign the first failed.
+
 Example of the kind of draft it produces:
 
 ```

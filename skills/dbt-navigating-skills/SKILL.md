@@ -7,7 +7,7 @@ metadata:
 
 # Navigating the skill set
 
-This library holds 27 skills across 78 files and roughly 19,300 lines. A single ordinary task — "add a column to an incremental mart model" — has plausible description matches totalling over 8,000 lines. **Reading everything that might be relevant is not an option, and reading whatever matched first is how a task gets done wrongly with confidence.**
+This library holds 27 skills across 78 files and roughly 19,500 lines. A single ordinary task — "add a column to an incremental mart model" — has plausible description matches totalling over 8,000 lines. **Reading everything that might be relevant is not an option, and reading whatever matched first is how a task gets done wrongly with confidence.**
 
 This skill is the entry point. It is 1.5% of the library and its whole job is to tell you which few hundred lines to read next.
 

@@ -34,6 +34,8 @@ The boundary against `dbt-onboarding-to-a-project` is worth stating precisely, b
 
 Four artifacts, and the distinction between them is not cosmetic — it determines whether a fact rots.
 
+**All four are a first pass.** A project's conventions and its business meaning are the accumulated result of years of decisions, and no single session derives all of them from the outside. Some of what you write will be an assumption that looked like a fact. That is the expected outcome, so **say so in the output and invite correction specifically**: name what you could not establish, mark every inference, and state plainly that this is a starting point to be extended rather than a finished description. A document that reads as authoritative gets quoted back; one that reads as a draft gets fixed. Expect a second pass as the project teaches more, and treat that as normal rather than as evidence the first was wrong.
+
 | Artifact | Holds | Test for belonging |
 |---|---|---|
 | `conventions.yml` | Structured, measurable conventions | A tool can verify it, and a skill needs it to make a decision |

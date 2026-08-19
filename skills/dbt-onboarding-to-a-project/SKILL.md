@@ -303,11 +303,13 @@ Report BI coverage as a *scope*, never as an absolute: "no references in the two
 
 Everything so far reads the repository, the manifest and the logs — so everything so far describes the project's *shape*. None of it tells you what the data is **about**: which operational systems feed this warehouse and what each is the system of record for, that the CRM's "customer" is a signed contract while the product database's is a login, that two sources describe overlapping but non-identical populations, or which of `fct_revenue` and `fct_bookings` Finance actually closes the books on. That is the layer where an agent's errors get expensive, because the SQL compiles, the tests pass, and the number is wrong in a way only someone who knows the business can see.
 
-Three things to build, each making the next cheaper: a **source-system inventory** (what feeds this, what each system is authoritative for, what is being migrated), an **entity map** (the business nouns, which datasets represent each, which one wins when they disagree), and the **join fabric** (how entities link across systems, on which keys, at what match rate, and what unmatched rows mean). Then per central mart: what decision it drives and who breaks if it is wrong.
+**The organizing frame is events.** A business is a sequence of things that happen — request → match → trip → payment, or signup → trial → subscription → invoice → payment — referencing a set of objects. That frame is what makes the warehouse readable, because fact tables *are* events at a grain, dimensions are the objects they reference, and marts are questions asked of them. Build the chain first: what happens in what order, where money enters, where volume drops by orders of magnitude, and which events get revised after the fact. Without it you are pattern-matching on table names, which is how two tables recording adjacent events get read as redundant.
 
-Almost none of this is derivable. The source list is in the repo; what a source is *for* is not. The join key is measurable; whether the two populations are supposed to match is a business fact. So this pass is mostly **structured asking**, which is why it belongs on arrival where the questions can be batched — and why the questions must carry what you already measured. Sampling actual values is one instrument here rather than the goal: it checks the map and surfaces the vocabulary nobody documented, but no volume of row counts will tell you which system is the system of record.
+Then, in order because each step makes the next cheaper: which system records which event and what each source **powers** (rank sources by dependents, not table count); **what sits upstream of dbt**, since a source is dbt's entry point and not the data's — a pre-aggregate, a lagged rebuild or a reprocessing window upstream explains behavior nothing in the repo does; the important fact tables read as events; the objects and which dataset is authoritative for each; how they link across systems; and what the central marts are for.
 
-The question sets, the sampling queries that reveal meaning rather than metadata, and the recording rules are in [`mapping-the-business.md`](./mapping-the-business.md). What you learn goes in `context.domain_notes`; `dbt-deriving-project-context` owns that artifact and the rule that keeps it honest — record interpretation, never measurement, and leave what nobody confirmed visibly empty rather than filling it with a plausible guess.
+Almost none of the *meaning* is derivable, so this pass is mostly **structured asking** — which is why it belongs on arrival where the questions can be batched, and why the questions must carry what you already measured. Everything derivable is derivable, though, and skipping it is the failure: a source inventory of "apparent subject, inferred from the name" is the file listing with a guess attached. Sampling real values, always under a bounded date predicate, is the instrument that checks the map throughout.
+
+**Treat the result as a first pass and say so.** It will contain assumptions that read like facts; mark them, name what you did not cover, and invite correction rather than presenting a complete-looking document. The procedure, the question sets and the recording rules are in [`mapping-the-business.md`](./mapping-the-business.md). What you learn goes in `context.domain_notes`; `dbt-deriving-project-context` owns that artifact and the rules that keep it honest.
 
 ---
 
@@ -431,12 +433,17 @@ Onboarding output is a short brief, not a report: node counts, the version and a
 - [ ] Inherited `schedules.default_tag` not mistaken for a per-model declaration
 - [ ] BI consumers traced from the contract, exposures, and the query log; instrument coverage proven before any negative was reported
 - [ ] BI findings reported as a scope, never as "no consumers"
-- [ ] Source systems inventoried, each with what it is the system of record for, and any migration-in-progress named
-- [ ] Core entities defined in business terms, with the authoritative dataset per entity and the trap a newcomer falls into
+- [ ] Event chain established — what happens in what order, where money enters, where volume drops, which events get revised
+- [ ] Source systems inventoried, each with the event it records and what it is the system of record for, and any migration-in-progress named
+- [ ] Sources ranked by what depends on them, and freshness checked under a bounded date predicate; any source not landing data reported as a finding
+- [ ] What sits upstream of each important source established — raw or pre-aggregated, whether it reprocesses, its own lag — or named as an open question
+- [ ] Important fact tables read as events: grain stated in one sentence, raw-versus-aggregated settled, non-additive measures identified
+- [ ] Core objects defined in business terms, with the authoritative dataset per object and the trap a newcomer falls into
 - [ ] Cross-system links recorded with cardinality and whether a sub-100% match rate is expected — before any join was written
 - [ ] Purpose established for the central marts: what decision each drives, and which similar model it must not be confused with
 - [ ] Data sampled against **production** with explicit database and schema, using compiled relation names rather than filenames
 - [ ] Interpretation recorded rather than measurement; nothing confirmed by nobody left as a plausible guess, and no real data values written to any file
+- [ ] Output presented as a first pass — inferences marked, gaps named, correction invited rather than a complete-looking document handed over
 - [ ] Untested models counted, and the count crossed against child counts to locate real risk
 - [ ] Activity measured from git; shallow-clone and bulk-reformat caveats checked before trusting dates
 - [ ] Ownership taken from `CODEOWNERS` or `meta`, not from the last committer

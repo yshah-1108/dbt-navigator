@@ -4,73 +4,157 @@ A DAG tells you which model feeds which. It does not tell you that `stg_salesfor
 
 This pass builds that layer. It is the difference between an agent that can edit a model and one that understands what the model is *about*.
 
-## The shape of the answer
+## The organizing idea: events flowing through systems
 
-You are building three things, in this order. Each one makes the next cheaper.
+A business is a **sequence of events** — things that happen, in order — and a set of **objects** those events reference. That is the frame to build, because it is the one the warehouse is a recording of.
 
-1. **A source-system inventory** — which operational systems feed this warehouse, and what each one is the system of record *for*.
-2. **An entity map** — the business nouns, which datasets represent each, and which representation is authoritative when two disagree.
-3. **The join fabric** — how entities link across systems, on which keys, and where the links are known to be imperfect.
+The events come in a chain, and the chain is the business:
 
-Then, per central mart: what it is *for*, who reads it, and which decision it drives. Purpose is the fact that makes everything else interpretable, and it is never in the repository.
+| Business | The event chain |
+|---|---|
+| Ride-hailing | request → match → pickup → trip → payment → rating |
+| Subscription software | signup → trial → subscription → invoice → payment → renewal or churn |
+| Commerce | cart → order → payment → fulfilment → delivery → return |
+| Lending | application → decision → origination → payment → delinquency → payoff |
 
-## 1. Source systems: what feeds this warehouse, and what it powers
+Once you have the chain and the objects, the warehouse becomes readable, because the structure maps onto it directly:
 
-Start from the sources, because every business fact enters through one and the source names carry the vendor vocabulary the rest of the project inherits.
+- **Fact tables are events**, at a grain. `fct_orders` is the order event, one row per order or per order-line.
+- **Dimensions are the objects** the events reference — customer, merchant, product, campaign, account.
+- **Marts are questions asked of the events**, usually joined to the objects and aggregated to a period.
+
+Miss the chain and you are pattern-matching on table names, which is how an agent concludes two tables are redundant when one records every request and the other only the matched ones. **The most important thing to learn is where one event becomes the next**, because that is where the volume drops by orders of magnitude, where money enters, and where the joins get hard.
+
+## Read this as a first pass, and say so in the output
+
+**This procedure produces a first draft, not a finished understanding.** It will miss things, and some of what it records will be an assumption that looked like a fact. That is the expected outcome, not a failure of the pass — a business's data model is the accumulated result of years of decisions, and no single session derives all of it from the outside.
+
+So two obligations. **Mark every inference as one**, so the reader can tell measurement from guess at a glance. And **say plainly, in the summary and in the artifact, that this is a first pass to be corrected and extended** — invite the specific corrections rather than presenting a complete-looking document. A file that reads as authoritative gets quoted back; a file that reads as a draft gets fixed. Expect to run this again as the project teaches you more, and treat the second pass as normal rather than as a sign the first was wrong.
+
+## Plan it before starting
+
+This is the largest single context-gathering job in the library and it goes wrong by wandering — sampling an interesting table for twenty minutes while the event chain stays unmapped. Work in the order below, because each step makes the next cheaper, and track it as state per `AGENTS.md` § *Carrying state across a session*:
+
+1. **The event spine** — what happens, in what order.
+2. **Which system records which event**, and what each source powers.
+3. **What sits upstream of dbt**, outside its horizon.
+4. **The important fact tables**, read as events.
+5. **The objects**, and which dataset is authoritative for each.
+6. **How objects link across systems.**
+7. **What the central marts are for.**
+
+## 1. Establish the event spine
+
+Ask for the chain in business words first — it takes one question and it makes every table name interpretable:
+
+> "Walk me through what happens from the start of a customer interaction to the point we recognize revenue. What are the steps, in order, and which ones do we record?"
+
+Then derive candidates and check them against the answer, because fact and source table names are usually named after the events:
 
 ```bash
-# every declared source and its tables -- the entry points to the whole project
+# fact tables name the events; source tables name the raw ones
+ls models/marts/**/fct_*.sql models/marts/**/*fact*.sql 2>/dev/null
+grep -rh '^\s*- name:' models --include='*.yml' | sort -u | head -40
+```
+
+Per event, four things worth establishing, and only the first is derivable:
+
+| What | Why it matters |
+|---|---|
+| Its **grain** — what one row is | Everything downstream depends on it, and it is the single most common source of double-counting |
+| Whether it is **immutable or revised** | A revised event (a trip later disputed, an order later refunded) means the source reprocesses, which decides `merge` versus `delete+insert` |
+| Which events are **money events** | These get the reconciliation requirements and the strictest tests |
+| The **drop-off to the next event** | Orders of magnitude between request and conversion. This tells you which tables are large, and a drop-off that changes is a real business signal or a real bug |
+
+## 2. Which system records which event
+
+Now map events to systems, because the answer to "where does this event live" is what makes the source list meaningful.
+
+Start from the declared sources, then trace what each powers and whether it is still alive — both derivable, and both come before asking anybody anything:
+
+```bash
 grep -rh -A2 '^\s*- name:' models --include='*.yml' | head -60
-find models -name '*.yml' | xargs grep -l 'sources:' 2>/dev/null
+
+# what depends on this source: importance is dependents, not table count
+dbt ls --select "source:<source_name>+" --resource-type model | wc -l
+dbt ls --select "source:<source_name>+,resource_type:exposure"
 ```
 
-That list is the *starting* point, not the finding. **A source inventory that stops at "apparent subject, inferred from the name" is not a business map** — it is the file listing with a guess attached, and it reads as knowledge. Two things turn it into one, and both are derivable, so do them before asking anybody anything.
+**A source inventory that stops at "apparent subject, inferred from the name" is not a business map** — it is the file listing with a guess attached, and it reads as knowledge. Rank sources by what depends on them, so a person's attention goes to the ones that matter.
 
-**Trace what each source powers.** A source's importance is not its table count; it is what depends on it. For each source, walk the DAG downstream to the marts and exposures it ultimately feeds:
-
-```bash
-dbt ls --select "source:<source_name>+" --resource-type model | wc -l   # blast radius
-dbt ls --select "source:<source_name>+,resource_type:exposure"          # what it publishes to
-dbt ls --select "source:<source_name>+" --output name | grep -E '^(mart|fct|dim)' # its marts
-```
-
-A source feeding three marts and the executive dashboard is a different object than one feeding a single unused staging model, and the difference tells you which sources are worth a person's time in the questions below. Rank them this way rather than treating all twenty as equals.
-
-**Then look at the data, with a date filter.** A source's real shape settles several questions a name cannot:
+Then sample recent rows, always under a bounded date predicate:
 
 ```sql
--- what the recent data looks like -- always bounded, never a full scan
 select * from <database>.<schema>.<table>
 where <timestamp_column> >= dateadd(day, -7, current_date)
 limit 20;
 
--- is this source live, or landed once and abandoned?
 select max(<timestamp_column>) as latest, count(*) as rows_last_7d
 from <database>.<schema>.<table>
 where <timestamp_column> >= dateadd(day, -7, current_date);
 ```
 
-The date predicate is not optional politeness — on a large event table an unbounded scan is expensive and may time out, and a `limit` alone does not bound the scan. Sampling recent rows tells you what the source actually carries, in its own vocabulary, and whether it is still receiving data. **A source with no rows in the last week is a finding**, and one of the most valuable available here: it means either a broken pipeline nobody noticed or a system already retired, and both change what you should build on.
+The date predicate is not politeness — on a large event table an unbounded scan is expensive and may time out, and **a `limit` alone does not bound the scan**. The timeout then gets reported as "could not establish," turning a derivable fact into a fake open question. **A source with no rows in the last week is a finding**: a broken pipeline nobody noticed, or a system already retired, and both change what you should build on.
 
-Only then ask, and now the questions are cheap because you can attach what you found:
+Then ask what no query answers:
 
 | Question | Why it cannot be derived |
 |---|---|
-| What is this system *for* in the business? | A schema shows tables, never the business process that produces them. |
+| Which event(s) does this system record, and what is it *for* in the business? | A schema shows tables, never the business process that produces them. |
 | What is it the **system of record** for? | Authority is an organizational decision. Two systems holding overlapping data is normal; which one wins is a policy. |
-| Who owns it, and who changes its schema? | Upstream ownership determines whether a breaking change upstream is negotiable or an event you absorb. |
-| How does data arrive — batch, stream, CDC, manual upload? | Determines whether late-arriving rows and mutable history are expected. Changes incremental strategy. |
-| Is it being migrated, deprecated, or replaced? | The single highest-value fact here, and it exists only in someone's head. Building on a system being retired next quarter is wasted work. |
+| Who owns it, and who changes its schema? | Upstream ownership decides whether a breaking change is negotiable or an event you absorb. |
+| How does data arrive — batch, stream, CDC, manual upload? | Decides whether late-arriving rows and mutable history are expected. Changes incremental strategy. |
+| Is it being migrated, deprecated, or replaced? | The highest-value fact here, and it exists only in someone's head. Building on a system being retired next quarter is wasted work. |
 
-The last one deserves its own emphasis. A project routinely contains two generations of the same source — the old system still landing data and the new one partially built — and nothing in the repository marks which is which. Both look live. Ask. If your freshness check found one of them stale, lead with that: "this source last landed data in March — is it retired?" is a question that answers itself in one reply.
+A project routinely contains two generations of the same source — the old one still landing data, the new one partially built — and nothing marks which is which. If your freshness check found one stale, lead with it: "this source last landed data in March — is it retired?" answers itself in one reply.
 
-**Ingestion tooling is worth one question of its own.** Whether sources arrive via a managed connector, an in-house pipeline, or a reverse-ETL loop back into the warehouse changes what "the source changed" means and who can fix it. It is also invisible in a dbt project, which sees only the landed tables.
+## 3. Look upstream of dbt's horizon
 
-## 2. Entities: the business nouns and which dataset is authoritative
+**A dbt source is the entry point to dbt, not the entry point to the data.** This is the step most often skipped, and the one that most often explains behavior that otherwise looks inexplicable.
+
+Before a dbt source there is usually a chain nobody in the dbt project can see: raw event logs, an ingestion or CDC pipeline, and — frequently — **a transformation another team already performed in another repository**. A "source" that is actually a pre-aggregate or a rebuilt table has semantics you must know, and none of them are visible from `sources.yml`:
+
+| What the upstream is | What it changes for you |
+|---|---|
+| **Raw log or event stream** | Detail is available if you need it; the dbt source may be a lossy subset |
+| **A pre-aggregate built elsewhere** | You *cannot* recover finer grain from it, and any request needing detail has to go upstream |
+| **A table rebuilt on a schedule, with lag** | Freshness is bounded by that rebuild, not by your run. Reading it early gets partial data with no error |
+| **A source that reprocesses a window** | `merge` silently leaves stale rows. This is the `delete+insert` case, and the upstream is the only place the fact lives |
+| **A reverse-ETL loop back into the warehouse** | Circularity: a table you build may feed a system that feeds a source you read |
+
+How to find it, in increasing order of effort:
+
+```bash
+# the source yml is the first place someone would have written it down
+grep -rn -A8 'name: <source_name>' models --include='*.yml'
+
+# the project's own tests and comments often name the upstream system
+grep -rn '<source_name>' tests/ macros/ --include='*.sql' | head
+```
+
+Then look outside this repository: the organization's other repos (an ingestion service, a Spark or Flink job, another dbt project), and the ingestion tool's own configuration. If a git host API is connected, search the org for the source or table name — the pipeline that produces it is frequently a named repository.
+
+**Where it cannot be found, ask specifically rather than generally.** "What builds `<table>`, and on what schedule?" is answerable in one line. "Tell me about our data pipeline" is not. The facts worth having: what produces it, whether it is raw or aggregated, whether it reprocesses history, and what its own lag is. Record these in `context.mechanisms` — a source that rebuilds with lag is bespoke machinery, and a skill's generic freshness advice is wrong without it.
+
+## 4. Read the important fact tables as events
+
+Fact tables are where the event model and the warehouse meet, so this is where understanding converts into correct SQL. Take the highest-fan-out ones from the DAG survey — not all of them.
+
+Per fact table:
+
+- **Which event does it record**, and at what grain. State it in one sentence: "one row per order line per day." If you cannot, you do not yet understand the table.
+- **Is it the raw event, or already aggregated?** An hourly rollup cannot answer a per-event question, and the difference is rarely in the name.
+- **Which objects does it reference**, and via which keys. These are its dimensions and they are the join surface.
+- **Which measures are additive**, and which are not. Rates, ratios and distinct counts do not sum, and summing them is a silent error. `dbt-designing-a-model/additivity.md` has the reasoning.
+- **Where does it sit in the chain**, and what is its relationship to the fact table before and after it. Two fact tables recording adjacent events are not redundant even when their columns look similar.
+
+Sample it under a date filter, and read whole rows rather than per-column statistics — what columns mean *together* is the thing a schema cannot show.
+
+## 5. Objects: the business nouns and which dataset is authoritative
 
 This is the section that prevents the most expensive class of error, because the same word means different things in different systems and the difference is never in a column name.
 
-For each core noun the business runs on — customer, account, order, subscription, product, campaign, user — establish:
+The objects are what the events reference — the dimensions the fact tables join to. For each core noun the business runs on (customer, account, order, subscription, product, campaign, merchant, user), establish:
 
 - **What it means here**, in business terms rather than table shape. Not "a row in `dim_customer`" but "an organization with at least one paid contract."
 - **Which datasets represent it**, across systems. Usually several.
@@ -79,9 +163,9 @@ For each core noun the business runs on — customer, account, order, subscripti
 
 The traps are the payload. The canonical example, and a version of it exists in almost every company: *a "customer" in the CRM is a signed contract, while a "customer" in the product database is a login. The two counts have never matched and are not supposed to.* An agent that does not know this will "fix" the discrepancy, and the fix is a bug.
 
-Where the same entity appears in two systems, ask the question that decides every future join: **is one a subset of the other, or do they overlap partially?** A subset means a left join is safe. Partial overlap means every join loses rows on both sides, and whether that loss is acceptable is a business call.
+Where the same object appears in two systems, ask the question that decides every future join: **is one a subset of the other, or do they overlap partially?** A subset means a left join is safe. Partial overlap means every join loses rows on both sides, and whether that loss is acceptable is a business call.
 
-## 3. The join fabric: how entities link across systems
+## 6. How objects link across systems
 
 Cross-system joins are where business meaning and technical mechanics meet, and where the failures are quiet.
 
@@ -97,9 +181,9 @@ For each link between systems, establish and record:
 
 `dbt-unifying-sources` covers the mechanics of building these joins. This pass establishes the *facts* they must respect. Do the map first: a union written without knowing that two sources overlap partially is a union that either drops or duplicates real business events.
 
-## 4. Per mart: what it is for
+## 7. Per mart: what it is for
 
-For the top 10–20 models by fan-out — the ranking step 2 produced — establish the three facts that no tool holds:
+For the top 10–20 models by fan-out — the ranking the DAG survey produced — establish the three facts that no tool holds:
 
 1. **What decision it drives.** "Finance closes the month on this" and "an analyst browses it occasionally" call for very different care with the same one-line change.
 2. **Who reads it, and how.** A dashboard, a scheduled export, a reverse-ETL sync into an operational tool, a notebook. The DAG and query log tell you *that* something reads it; only a person tells you what breaks in their week when it is wrong.
@@ -107,28 +191,25 @@ For the top 10–20 models by fan-out — the ranking step 2 produced — establ
 
 An exposure with an empty description gives you the link and not the criticality — the link is derivable, the importance is a question. That gap is exactly what this step closes.
 
-## 5. Sampling the data — as an instrument, not the goal
+## Sampling: the instrument, used throughout
 
-Reading actual values is how you *check* the business map and find the vocabulary nobody documented. It is a means to the map, not a substitute for it: a thousand row counts still will not tell you which system is the system of record.
+Reading actual values is how you *check* the map at every step above — it is not a step of its own, and it is not the goal. A thousand row counts will not tell you which system is the system of record.
 
-Preconditions first, because a profile of the wrong relation is worse than none — it reads as fact. Read **production** with explicit database and schema (`ref()` in a dev target may resolve to a partial build or fall back silently — see `dbt-environments`), and take the relation name from **compiled SQL, not the filename**, since an `alias` or a custom schema macro breaks that assumption (`dbt-gathering-context` §7).
-
-The three queries that teach the most about *meaning*:
+Preconditions, because a profile of the wrong relation is worse than none — it reads as fact. Read **production** with explicit database and schema (`ref()` in a dev target may resolve to a partial build or fall back silently — see `dbt-environments`), and take the relation name from **compiled SQL, not the filename**, since an `alias` or a custom schema macro breaks that assumption (`dbt-gathering-context` §7). Bound every query on an event table with a date predicate.
 
 ```sql
--- 1. Categorical domains: the live vocabulary, which the docs rarely match
+-- Categorical domains: the live vocabulary, which the docs rarely match
 select <column>, count(*) as n
 from <database>.<schema>.<relation>
+where <timestamp_column> >= dateadd(day, -7, current_date)
 group by 1 order by n desc limit 30;
 
--- 2. Whole rows: what columns mean together, which no per-column stat shows
-select * from <database>.<schema>.<relation> limit 5;
-
--- 3. Cross-system match rate: whether a business link actually holds
+-- Cross-system match rate: whether a business link actually holds
 select count(*) as total,
        count(<foreign_key>) as has_key,
        count(distinct <foreign_key>) as distinct_keys
-from <database>.<schema>.<relation>;
+from <database>.<schema>.<relation>
+where <timestamp_column> >= dateadd(day, -7, current_date);
 ```
 
 What to look for, and what each finding means in business terms:
@@ -138,13 +219,14 @@ What to look for, and what each finding means in business terms:
 - **One value is 94% of rows.** That is the default path; the rest are edge cases someone will forget. Worth knowing which are real business cases and which are legacy.
 - **Units are wrong from the range.** Amounts averaging 4,000 on a consumer product are cents. A "rate" above 1.0 is not a rate. No documentation states this and every downstream calculation depends on it.
 - **History starts later than expected.** A migration discarded what came before. Any year-over-year calculation is wrong before it is written, and *why* the boundary exists is knowledge only a person has.
-- **A match rate that surprises you.** This is the fastest way to discover that two systems do not describe the same population.
+- **A match rate that surprises you.** The fastest way to discover that two systems do not describe the same population.
+- **A drop-off between adjacent events that does not match the business's expectation.** Either your understanding of the chain is wrong or something is broken, and both are worth knowing.
 
 **Measured distributions are not thresholds.** Two years at 3% null tells you 3% is *normal*, never that it is *acceptable*. That line is a business tolerance: bring the number and ask.
 
 ## Recording it
 
-This goes in `context.domain_notes`, whose template (`examples/domain.example.md`) already has the sections — source systems, core entities with a trap column, entity links, canonical metric definitions, timezone rules, known traps, closed decisions. `dbt-deriving-project-context` owns the artifact and its rules.
+This goes in `context.domain_notes`, whose template (`examples/domain.example.md`) has the sections — the event chain, source systems, core objects with a trap column, how they link, canonical metric definitions, timezone rules, known traps, closed decisions. `dbt-deriving-project-context` owns the artifact and its rules.
 
 Three constraints, each preventing a specific failure:
 
@@ -154,17 +236,23 @@ Three constraints, each preventing a specific failure:
 
 **Leave what you could not confirm visibly empty, marked as a question.** An empty "canonical definitions" section is a visible gap someone will fill. A plausible guess is an invisible error that will be cited as fact — and unlike a stale tool reading, a wrong note gives no sign that it is wrong.
 
+**Say in the file that it is a first pass, and date it.** The next reader needs to know whether they are looking at a draft to extend or a document to trust, and only the file can tell them. Name what was not covered — the sources you did not trace, the events you could not confirm — so the gaps are visible work items rather than silent absences.
+
 ## Failure modes
 
-1. **A source inventory that is the file listing with a guess attached.** Twenty rows of "appears to be, inferred from the name" is not a business map. Every one of those rows had a derivable downstream blast radius, a measurable freshness, and twenty sample rows available, and none of that was gathered. This is the most likely way this pass produces something that looks thorough and teaches nothing.
-2. **Declaring something a question for the human that a connected tool answers.** See §0 of `dbt-deriving-project-context`. Asking someone to tell you their warehouse is reachable is the inversion of deriving.
-3. **Profiling instead of understanding.** Row counts, max dates and null rates feel like progress and answer none of the questions above. Metadata is the instrument; the business map is the deliverable.
-4. **Inventing business meaning from names.** `dim_customer` does not tell you what a customer is here. A definition assembled from naming conventions reads authoritative and is a guess.
-5. **Assuming one system is authoritative because it has more rows.** Authority is a policy, not a row count.
-6. **Treating two systems' entities as the same population.** The most expensive error available here. Ask whether one is a subset or the overlap is partial, before writing the join.
-7. **Reading a discrepancy as a bug.** Two customer counts that never matched may be correct by definition. Classify with whoever owns the definition before "fixing" it.
-8. **Profiling dev and believing it.** A partial or 100-row dev copy makes every conclusion worthless, and the numbers look just as real.
-9. **Querying by filename on an aliased model.** You read a stale relation or nothing, and "no rows" reads as a finding.
-10. **Scanning an event table without a date predicate.** A `limit` does not bound the scan. The query is expensive, may time out, and the timeout then gets reported as "could not establish."
-11. **Copying real data into a repository file.** The one irreversible mistake available in this pass.
-12. **Doing this for every model and every source equally.** Rank by what depends on them. Twenty central models is a day well spent; three hundred is a week that teaches less, because nobody reads the result.
+1. **Mapping tables instead of the business.** A list of sources and marts with no event chain is an inventory, not an understanding. If you cannot say what happens first, what happens next, and where money enters, you have not done this pass.
+2. **A source inventory that is the file listing with a guess attached.** Twenty rows of "appears to be, inferred from the name" is not a business map. Every one of those rows had a derivable downstream blast radius, a measurable freshness, and twenty sample rows available, and none of that was gathered. This is the most likely way this pass produces something that looks thorough and teaches nothing.
+3. **Stopping at the dbt source.** A source is dbt's entry point, not the data's. A pre-aggregate, a lagged rebuild, or a reprocessing window upstream explains behavior that is otherwise inexplicable, and none of it is visible in `sources.yml`.
+4. **Declaring something a question for the human that a connected tool answers.** See §0 of `dbt-deriving-project-context`. Asking someone to tell you their warehouse is reachable is the inversion of deriving.
+5. **Presenting a first pass as complete.** The output will contain assumptions. Unmarked, they get quoted back as facts, and the person who could have corrected them in ten seconds never sees that there was anything to correct.
+6. **Profiling instead of understanding.** Row counts, max dates and null rates feel like progress and answer none of the questions above. Metadata is the instrument; the business map is the deliverable.
+7. **Inventing business meaning from names.** `dim_customer` does not tell you what a customer is here. A definition assembled from naming conventions reads authoritative and is a guess.
+8. **Assuming one system is authoritative because it has more rows.** Authority is a policy, not a row count.
+9. **Treating two systems' objects as the same population.** The most expensive error available here. Ask whether one is a subset or the overlap is partial, before writing the join.
+10. **Treating two adjacent event tables as redundant.** All requests and matched requests look similar and are not the same event. The chain is what distinguishes them.
+11. **Reading a discrepancy as a bug.** Two customer counts that never matched may be correct by definition. Classify with whoever owns the definition before "fixing" it.
+12. **Profiling dev and believing it.** A partial or 100-row dev copy makes every conclusion worthless, and the numbers look just as real.
+13. **Querying by filename on an aliased model.** You read a stale relation or nothing, and "no rows" reads as a finding.
+14. **Scanning an event table without a date predicate.** A `limit` does not bound the scan. The query is expensive, may time out, and the timeout then gets reported as "could not establish."
+15. **Copying real data into a repository file.** The one irreversible mistake available in this pass.
+16. **Doing this for every model and every source equally.** Rank by what depends on them. Twenty central models is a day well spent; three hundred is a week that teaches less, because nobody reads the result.
