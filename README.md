@@ -4,7 +4,7 @@
 
 A skills library that teaches coding agents how to work in a **dbt** project — and reads your conventions from a file you own, instead of imposing someone else's.
 
-Installable as a plugin for **Claude Code** and **Cursor**. Works via `AGENTS.md` with **Codex**, **Gemini CLI**, and any agent that reads it.
+Installable as a plugin for **Claude Code** and **Cursor** (Cursor via local install until it clears marketplace review). Works via `AGENTS.md` with **Codex**, **Gemini CLI**, and any agent that reads it.
 
 ## Why this exists
 
@@ -154,9 +154,16 @@ The marketplace lives in the same repo as the plugin, so adding the marketplace 
 
 ### Cursor
 
+Cursor's plugin marketplace is curated — plugins are submitted and manually reviewed before listing — so until this is accepted there, install it as a local plugin:
+
+```bash
+git clone https://github.com/yshah-1108/dbt-navigator.git \
+  ~/.cursor/plugins/local/dbt-navigator
 ```
-/add-plugin dbt-navigator
-```
+
+Then restart Cursor, or run **Developer: Reload Window**. Cursor reads `.cursor-plugin/plugin.json` and loads all 27 skills; check **Customize → Skills**.
+
+Alternatively, skip plugins entirely and install just the skills with the `npx` command below — Cursor reads `~/.cursor/skills/` and `.cursor/skills/` natively.
 
 ### Any agent supporting the Agent Skills standard
 
