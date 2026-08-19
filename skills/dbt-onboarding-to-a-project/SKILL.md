@@ -49,6 +49,14 @@ cat conventions.yml 2>/dev/null || cat .dbt-agent/conventions.yml 2>/dev/null ||
 
 ---
 
+## 0. Establish what you can reach
+
+**Before measuring anything, find out which instruments you have** — and do it without being prompted. Which facts in the steps below are available at all depends entirely on this, and an agent that skips it produces a brief full of "could not establish" for things that were one call away. The concrete integrations are usually a warehouse MCP or CLI, dbt metadata or a Cloud API, the query log, a git host CLI, a docs and ticket system, a BI catalog. Attempt one cheap call against each: a connection can be configured and unauthorized, or authorized and blind to the class you need, and those are indistinguishable from the config alone.
+
+The full table, with what each instrument answers and what its absence costs, is in `dbt-deriving-project-context` §0. The rule that matters is the same here: **never report something as unknown when a connected tool answers it**, and where an instrument is genuinely missing, name it and what it would have told you rather than leaving a silent gap. Record the sweep nowhere — live integration state rots faster than anything in a config file.
+
+---
+
 ## 1. dbt version and adapter
 
 **This skill owns version detection.** Six other skills gate advice on a minimum version — unit tests need 1.8+, the microbatch incremental strategy and YAML snapshots need 1.9+, `arguments:` in test definitions needs 1.10.5+ — and none of them should be re-deriving it. Establish it once, on arrival, and carry it for the session.
@@ -409,10 +417,13 @@ Every item here is something an agent does out of helpfulness, and every one of 
 
 Onboarding output is a short brief, not a report: node counts, the version and adapter, the highest-fan-out models, what schedules this project, what consumes it and how confidently you know, where coverage is thin, and any stated gap. Then the task.
 
+**Say what the brief does not cover.** It is a first pass over someone else's years of decisions, and the parts drawn from the repository alone are the weakest — business meaning, why a pattern exists, which of two similar marts is canonical. Name the specific gaps and what would close them, so they read as open work rather than as absence of a problem. A brief with no gaps on a mature project means something was inferred.
+
 **Not every arrival needs every section.** Steps 1–8 are the graph and its guarantees — cheap, mechanical, and worth running whenever you arrive cold. The business map in 6b is different in kind: it is mostly asking people, its answers change on the timescale of reorganizations rather than commits, and it is written down once and then read. Run it when the project has no `context.domain_notes`, when what is there is stale enough to mislead, or when the task turns on business meaning — a metric definition, a cross-system join, which of two similar marts is canonical. Do not re-interview the team on a Tuesday to fix a typo. Where the artifact already exists, reading it *is* this step.
 
 ## Completion checklist
 
+- [ ] Instruments swept before measuring, with one cheap call attempted against each rather than assumed absent
 - [ ] Contract read; absent fields named, with the specific degradation stated rather than guessed around
 - [ ] `dbt --version` run; core version, adapter, and `require-dbt-version` all recorded, and any disagreement between them resolved
 - [ ] Behavior-change `flags:` block read before assuming any version-dependent default

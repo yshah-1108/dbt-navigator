@@ -81,9 +81,12 @@ You do not write `conventions.yml` from scratch. After installing (see [Installa
 
 ```
 Read the dbt-deriving-project-context skill and derive this project's context.
-Measure the repo, don't assume. Write conventions.yml plus the .dbt-agent/
-prose files, cite the count behind each value, mark inferences NEEDS
-CONFIRMATION, and list what you could not establish as questions for me.
+Measure the repo, don't assume — and use whatever tools you have (warehouse,
+dbt, git host, wiki) before deciding something is unknowable. Map the business
+too: the source systems, what each powers, and what the main marts are for.
+Write conventions.yml plus the .dbt-agent/ prose files, cite the count behind
+each value, mark inferences NEEDS CONFIRMATION, and finish by telling me what
+this first pass covers, what is thin, and what you could not establish.
 ```
 
 The agent measures your repo — prefix distribution, separator, materializations, timestamp suffixes, surrogate key naming, schedule tags — and presents a draft with adherence percentages for you to confirm. Only genuinely unknowable fields become questions.

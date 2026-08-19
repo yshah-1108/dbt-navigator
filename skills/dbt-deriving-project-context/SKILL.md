@@ -273,6 +273,28 @@ Worked examples of the distinction, all three of which appear in real projects:
 
 **A finding is not licence to change anything.** Say what you found, which verdict it earned, and what you would do about it. Then wait to be asked. An agent that arrives and normalizes the old layer produces a hundred-file diff, an unsized blast radius, and a reviewer who distrusts everything else in the change.
 
+## 4b. Map the business the models serve
+
+Steps 1–4 measured the *project*: its names, its machinery, its code shape, its history. All of it came from the repository, and none of it says what the data is **about** — which operational systems feed this warehouse and what each is authoritative for, what the business events are and in what order they happen, what sits upstream of the dbt sources, or which of two similar marts Finance actually closes on. Writing `domain.md` without this step is what produces a business section that is the source list with a guess attached.
+
+**Do this before writing anything**, because it is a gathering pass and the artifacts are downstream of it. The procedure — the event chain, the source inventory with downstream tracing, the upstream-of-dbt lookup, the fact tables read as events, the objects and their cross-system links — is [`../dbt-onboarding-to-a-project/mapping-the-business.md`](../dbt-onboarding-to-a-project/mapping-the-business.md). Run it, then return here to write.
+
+Two dependencies it assumes, both cheap if you have not run the full onboarding survey:
+
+```bash
+# fan-out ranking: which models are central, so you profile those and not all 300
+dbt ls --select "<model>+" --resource-type model   # per candidate, or use the manifest
+python3 -c "import json;m=json.load(open('target/manifest.json'));\
+[print(len(v),k) for k,v in sorted(m['child_map'].items(),key=lambda x:-len(x[1]))[:20]]"
+
+# what each source powers, which is how you rank sources by importance
+dbt ls --select "source:<name>+" --resource-type model | wc -l
+```
+
+Scope it to what depends on things: the top 10–20 models by fan-out and the sources feeding them. Profiling everything is how this step becomes a week that teaches less than a day.
+
+---
+
 ## 5. Write it down, honestly
 
 Populate the four artifacts. Two habits carry most of the value:
@@ -336,6 +358,27 @@ fi
 
 If the schema rejects a value that is genuinely correct for this project, that is a finding about the library, not a reason to weaken the contract. Report it.
 
+---
+
+## 7. Hand it back as a first pass
+
+**How this is presented determines whether it gets corrected or believed.** The files now look authoritative — schema-valid, cited, structured — and a person who reads them as finished will quote them back for months. Some of what is in them is an assumption that survived because nobody checked it. So the handback is not a summary of what you did; it is an instrument for getting the wrong parts fixed while someone is still paying attention.
+
+Say five things, in this order:
+
+1. **What this covers, and what it does not.** The heavy lifting is done: the taxonomy is measured, the machinery is documented, the appraisal is made. What is thin is what a repository cannot tell you — business meaning, the reasons behind decisions, and anything nobody wrote down. Name the specific thin parts rather than the category.
+2. **The numbers behind the load-bearing values**, so the confidence is legible. "`stg_` at 94% of staging models (312 of 332)" invites a correction that "measured the prefix convention" does not.
+3. **What is unconfirmed, as a short ranked list.** Highest-value first, each with what it unblocks. This is the part someone can act on in five minutes, and it is worth more than the rest of the summary.
+4. **What you could not reach, and what it would have told you.** If an instrument was missing, name it and what connecting it would resolve. That is a decision the team can make; a silent gap is not.
+5. **That a second pass is expected.** Not an apology — a plan. The contract improves as the project teaches more, and re-running this after a few real tasks is the normal way it gets good.
+
+Two failure modes to avoid at this last step, both of which waste the work:
+
+- **Presenting completeness.** A confident summary with no open questions reads as finished and gets no review. If your question list is empty after a first pass on a mature project, that is evidence you inferred something you should have asked.
+- **Narrating the process.** Which commands you ran is not the deliverable and it buries the two facts that mattered. Report findings and numbers; leave the derivation out unless asked.
+
+Put the same framing in the files themselves, not just the chat message. The chat scrolls away and the files are what the next agent and the next engineer read: date them, mark inferences, and say in the header that this is a first pass with named gaps.
+
 ## Completion checklist
 
 - [ ] Instruments inventoried first, with one cheap call attempted against each rather than assumed absent
@@ -363,6 +406,10 @@ If the schema rejects a value that is genuinely correct for this project, that i
 - [ ] No `AGENTS.md` rule cited by number for a project fact; conventions attributed to what was measured
 - [ ] Contract validated against the schema, or its absence recorded honestly (never a fabricated pass, never a sibling repo's schema)
 - [ ] Two or more load-bearing values re-derived independently to confirm
+- [ ] Business map run **before** the artifacts were written, not discovered as a gap at writing time
+- [ ] Handback states what is covered and what is thin, with the thin parts named specifically rather than as a category
+- [ ] Unconfirmed items handed back as a short ranked list, each with what it unblocks — and the list is not empty on a mature project
+- [ ] First-pass framing written into the files themselves, dated, not only said in the chat
 - [ ] Findings reported; nothing normalized without being asked
 
 ## Common failure modes

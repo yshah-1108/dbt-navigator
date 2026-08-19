@@ -14,7 +14,11 @@ Install per the README, then, before anything else:
 Read the dbt-deriving-project-context skill and derive this project's context.
 ```
 
-The agent measures your repo and drafts `conventions.yml` with adherence percentages, then writes `.dbt-agent/mechanisms.md`, `domain.md` and `references.md`. **Review these as documents about your team, not config files.** Three failure modes to watch for:
+The agent measures your repo and drafts `conventions.yml` with adherence percentages, then writes `.dbt-agent/mechanisms.md`, `domain.md` and `references.md`. **Review these as documents about your team, not config files.**
+
+**Expect a first pass, not a finished description.** The heavy lifting is real — the taxonomy is measured, your bespoke machinery is documented, every practice is appraised — and it is still an outsider's reading of years of accumulated decisions. The agent should end by telling you what it covered, what is thin, and what it could not establish. If it hands you a confident summary with no open questions, that is the warning sign: on a mature project an empty question list means something was inferred that should have been asked. Plan to run it again after a few real tasks; the second pass is where it gets good.
+
+Three failure modes to watch for:
 
 - **Aspiration.** If someone writes down the taxonomy they wish existed, every skill will flag two-thirds of your models as violations, and your team will learn to ignore the output within a week. Record what the project *does*. Fix the codebase separately if you want it to change.
 - **Guessed fields.** Anything the agent could not measure should have been asked, not filled in. `project.query_history_retention_days` is the one that matters most: it is stated in the contract because an agent otherwise has no way to know how far back the query log reaches, and a "nothing has read this in 90 days" claim drawn from a 7-day log is how a live model gets deleted.

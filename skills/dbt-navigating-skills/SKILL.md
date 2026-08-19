@@ -193,7 +193,11 @@ Escalate only if: the model is consumed by BI or has grants applied out of band 
 
 Read `dbt-onboarding-to-a-project` in full — it is the one skill designed to be read start to finish. If `conventions.yml` is missing, `dbt-deriving-project-context` comes first, because everything else depends on the contract existing.
 
-Its business-map pass (§6b, `mapping-the-business.md`) is the one section that is conditional rather than routine: run it when `context.domain_notes` is missing or stale, or when the task turns on business meaning — a metric definition, a cross-system join, which of two similar marts is canonical. It is mostly structured asking, so batch the questions. Where the artifact already exists, reading it is the step.
+Whichever you run, **start with the instrument sweep** (onboarding §0, or deriving §0 for the full table). What is answerable at all depends on it, and skipping it is how a brief ends up full of open questions that a connected tool would have closed.
+
+Its business-map pass (§6b, `mapping-the-business.md`) is the one section that is conditional rather than routine: run it when `context.domain_notes` is missing or stale, or when the task turns on business meaning — a metric definition, a cross-system join, which of two similar marts is canonical. It is mostly structured asking, so batch the questions. Where the artifact already exists, reading it is the step. **When deriving the contract, that pass comes before writing the artifacts** (deriving §4b), not after — the business sections cannot be written from the repository alone.
+
+**Hand the result back as a first pass.** Say what is covered, what is thin, and what could not be established, as a ranked list. An empty question list on a mature project is evidence something was inferred rather than asked.
 
 ### I. Add or improve tests on an existing model
 
