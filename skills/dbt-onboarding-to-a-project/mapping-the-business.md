@@ -132,9 +132,14 @@ grep -rn -A8 'name: <source_name>' models --include='*.yml'
 grep -rn '<source_name>' tests/ macros/ --include='*.sql' | head
 ```
 
-Then look outside this repository: the organization's other repos (an ingestion service, a Spark or Flink job, another dbt project), and the ingestion tool's own configuration. If a git host API is connected, search the org for the source or table name — the pipeline that produces it is frequently a named repository.
+Then look outside this repository, and use the connected tools by name rather than treating this as unknowable:
 
-**Where it cannot be found, ask specifically rather than generally.** "What builds `<table>`, and on what schedule?" is answerable in one line. "Tell me about our data pipeline" is not. The facts worth having: what produces it, whether it is raw or aggregated, whether it reprocesses history, and what its own lag is. Record these in `context.mechanisms` — a source that rebuilds with lag is bespoke machinery, and a skill's generic freshness advice is wrong without it.
+- **The git host** (GitHub/GitLab MCP, or `gh search code` / `gh search repos`) — search the *organization* for the source or table name. The pipeline that produces it is frequently a named repository: an ingestion service, a Spark or Flink job, or another dbt project. This is the single highest-yield lookup in this step and the one most often skipped.
+- **The docs and ticket system** (Atlassian MCP for Confluence and Jira, or Notion) — a pipeline someone built usually has a page or a ticket, and the ticket says what it was *for*.
+- **The ingestion tool** (Fivetran, Airbyte, Stitch) — its connector config states the sync mode and cadence, which is exactly the "does it reprocess" answer.
+- **The warehouse's own metadata** — object dependencies or view definitions can reveal that a "source" is a view over something else entirely.
+
+**Where it still cannot be found, ask specifically rather than generally.** "What builds `<table>`, and on what schedule?" is answerable in one line. "Tell me about our data pipeline" is not. The facts worth having: what produces it, whether it is raw or aggregated, whether it reprocesses history, and what its own lag is. Record these in `context.mechanisms` — a source that rebuilds with lag is bespoke machinery, and a skill's generic freshness advice is wrong without it.
 
 ## 4. Read the important fact tables as events
 

@@ -72,6 +72,8 @@ Two things to be explicit about, because both are invisible in the schema and bo
 
 Only metrics where **two plausible definitions exist and one is correct**. This is the highest-value section in the file, because SQL can show what is computed but never which rival definition is canonical, and getting it wrong produces a number that looks right and is not.
 
+**Search the wiki and the ticket tracker for the metric name before leaving this empty.** A data dictionary page, a finance definition doc, or the ticket behind the model often has the answer already written down — in which case the job is confirming it, not sourcing it. Mark anything found that way as `documented, unconfirmed` with a link, because a wiki page can be years stale.
+
 ### `<metric name>`
 
 - **Definition:** `<the arithmetic, in words>`

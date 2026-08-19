@@ -60,24 +60,43 @@ The failure this guards against is narrowing "convention" to "naming," recording
 
 **Do this first, before measuring anything, and do it without being asked.** The failure this prevents is specific and common: the pass runs entirely on the filesystem and git, produces a list of open questions for the human, and every one of them was answerable by a tool that was connected the whole time. The person then has to tell the agent it has tools — which is the agent asking someone to do its own capability discovery, the exact inversion of the derive-versus-ask rule.
 
-Check what is actually reachable, in one sweep:
+Check what is actually reachable, in one sweep. The concrete integrations are usually some subset of these, and the names are worth knowing because you are looking for them by name:
 
-| Instrument | Answers | Without it |
-|---|---|---|
-| Warehouse query access | Schema, grain, cardinality, enum domains, real date ranges, query-log retention | Every claim about data becomes an inference from names |
-| dbt metadata or Cloud API | Jobs and their enabled state, schedules, run history, deferred manifests | Orchestration is a question rather than a measurement |
-| Query log | Who reads what, and how recently | No BI or ad-hoc consumer evidence at all |
-| Git host API | PRs behind a pattern, review discussion, `CODEOWNERS` | Intent must come from commit messages alone |
-| BI tool API or catalog | Dashboards and their owners | Consumers limited to declared exposures |
+| Instrument | Typically | Answers | Without it |
+|---|---|---|---|
+| **Warehouse** | Snowflake, BigQuery, Databricks, Redshift, Postgres — MCP server or CLI | Schema, grain, cardinality, enum domains, units, real date ranges, freshness, query-log retention | Every claim about data becomes an inference from names |
+| **dbt** | dbt MCP, dbt Cloud Admin/Discovery API, or the local CLI | Jobs and their enabled state, schedules, run history, lineage, deferred manifests, compiled SQL | Orchestration is a question rather than a measurement |
+| **Query log** | `snowflake.account_usage.query_history` or the platform equivalent | Who reads what, how recently, what it costs | No ad-hoc consumer evidence at all, and no cost evidence |
+| **Git host** | GitHub or GitLab MCP/CLI (`gh`, `glab`) | PRs behind a pattern, review discussion, `CODEOWNERS`, CI runs, **and the org's other repos** — where the pipeline upstream of a source usually lives | Intent must come from local commit messages alone |
+| **Docs and tickets** | Atlassian MCP (Confluence, Jira), Notion, Slack | Data dictionaries, metric definitions, runbooks, the ticket that says *why* a model was built, incident history | Business meaning gets classified as un-derivable when it is written down |
+| **BI** | Your BI platform's API or metadata catalog | Dashboards, their owners, which fields they use | Consumers limited to declared exposures |
+| **Observability** | Monte Carlo, Elementary, Anomalo | Incident history, freshness monitors, existing coverage | You may rebuild monitoring that already exists |
+| **Ingestion** | Fivetran, Airbyte, Stitch — API or config | What lands each source, on what cadence, with what sync mode | The upstream of every source is a question |
+
+**Reach for all of them, not just the obvious two.** The warehouse and dbt answer the structural questions and are the ones an agent reaches for by reflex. The rest answer questions that otherwise get handed back to a person, and the git host and the docs system are the two most underused: the repository next door explains the source you could not trace, and the wiki frequently contains the metric definition this skill would otherwise tell you to leave blank.
 
 **A tool you have not tried is not an absent tool.** Attempt one cheap call against each before concluding anything about coverage — a connection can be configured and unauthorized, or authorized and blind to the class you need, and those look identical from the config. Then apply `dbt-gathering-context` §3 to whatever comes back, because a well-formed empty answer is the most dangerous result any of them returns.
+
+### Business meaning is not always un-derivable
+
+This library says repeatedly that business meaning cannot be computed and has to come from a person. That is true of the *decision* — which of two definitions is canonical — and frequently **false of the record of it**, because somebody already wrote it down:
+
+| Looking for | Try before asking |
+|---|---|
+| What a metric means, canonically | Confluence or Notion search for the metric name; the definition often exists in a data dictionary nobody linked |
+| Why a model exists, or why it looks wrong | The Jira ticket and the PR that introduced it — search the ticket key from the branch name or commit message |
+| What an incident taught | Jira incident tickets, the observability tool's history, or a Slack channel |
+| What a source system is *for* | The upstream repo's README, and the ingestion tool's connector config |
+| Who owns a domain | `CODEOWNERS` and model `meta` first; the wiki's team pages second |
+
+Search the wiki and the tracker for the entity or metric name **before** putting it on the questions list. An answer found this way still needs confirming — a Confluence page can be four years stale — so mark it as *documented, unconfirmed* rather than as measured. But arriving with "your wiki says revenue is recognized on delivery; is that still right?" is a question someone answers in one word, and it is a far better use of their attention than "how do you define revenue?"
 
 Two rules follow, and they are the point of this step:
 
 - **Never write an open question for something a connected tool can answer.** Resolve it, or state which instrument you lack and what it would have told you. An "open question" that was one API call away trains the reader to stop reading your questions.
 - **When an instrument is genuinely missing, name it and recommend connecting it** — with the specific facts that stayed unknown as the reason. That is a far more useful hand-back than a bare question, because it tells the person what they are buying.
 
-Record the *result* of this sweep nowhere. Which tools are connected is live state, and a hand-maintained inventory of integrations rots faster than anything else in a config file. Rediscover it each session; it costs one sweep.
+Record the *result* of this sweep nowhere. Which tools are connected is live state, and a hand-maintained inventory of integrations rots faster than anything else in a config file. Rediscover it each session; it costs one sweep. What *does* get recorded is any document you found worth returning to — as a link and the question it answers, in `context.references`, never as a pasted copy.
 
 ---
 
@@ -270,6 +289,8 @@ The fields that most often get guessed, and should not be:
 
 Leave the canonical-metric section **empty rather than invented** if nobody has confirmed the definitions. SQL shows what is computed, never which of two rival definitions is canonical. An empty section is a visible question; a plausible guess is an invisible error, and it will be quoted back as authority.
 
+**"Nobody has confirmed it" is not the same as "nobody has written it down."** Search the wiki and the ticket tracker for the metric by name before leaving the section blank — a data dictionary page or the ticket behind the model frequently holds the definition, and finding it converts a question into a one-word confirmation. Record what you find as `documented, unconfirmed` with the link, since a page can be years stale. That is a third state, and it is more useful than either alternative: better than empty, because it gives the next reader something to check, and honest about not being ratified.
+
 That constraint binds hardest on the three sections of `domain.md` that describe the business rather than the code — **source systems** and what each is the system of record for, **how entities link across systems**, and **what the central marts are for**. None of it is in the repository, and all of it is guessable from names, which is the dangerous combination: an agent that infers "Salesforce is the system of record for customers" from a directory name produces a confident sentence that the next twenty sessions treat as established. The procedure for establishing these properly — what to derive, what to ask in one batch, and how sampling actual values checks the answer — is [`../dbt-onboarding-to-a-project/mapping-the-business.md`](../dbt-onboarding-to-a-project/mapping-the-business.md). Run it before writing those sections, and where it ends in an unanswered question, leave the section empty and put the question on the list you hand back.
 
 **Do not cite `AGENTS.md` rules by number, and do not treat `AGENTS.md` as this project's rulebook.** `AGENTS.md` is *this library's* generic agent guide — it ships with the skills and its universal rules are the same in every project that installs them. It is not a project-specific document, and its rule numbers are not stable: an adopter reorders or inserts one and every numeric citation silently points at the wrong rule while still reading as authoritative. The failure looks like attributing "dev detection keys off `target.database`" to a numbered universal rule that is actually about something else — the fact was *measured*, but the citation makes it look sourced from a rule, and the next agent follows the number to the wrong place. When you record a project convention, attribute it to **what you measured** ("observed in every `int_` model sampled"). When a point genuinely is one of the universal rules, cite its **content** ("the `>=`-not-`>` incremental-boundary rule"), never its number.
@@ -318,6 +339,8 @@ If the schema rejects a value that is genuinely correct for this project, that i
 ## Completion checklist
 
 - [ ] Instruments inventoried first, with one cheap call attempted against each rather than assumed absent
+- [ ] Docs and ticket systems searched for metric and entity names before anything was recorded as un-derivable; what was found marked `documented, unconfirmed` with a link
+- [ ] The organization's other repositories searched for what produces each important source
 - [ ] No open question left standing that a connected tool could have answered; where an instrument is genuinely missing, it is named along with what it would have told you
 - [ ] Sources ranked by what depends on them — downstream marts and exposures traced, not table counts compared
 - [ ] Source freshness checked with a bounded date predicate; any source not landing data reported as a finding rather than listed as live
