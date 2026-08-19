@@ -4,6 +4,13 @@ on:
   push:
     branches: [main]
   pull_request:
+  # The leak scan depends on a repository secret, and a secret is not
+  # available to a run that predates it or to a pull request from a fork.
+  # Both cases pass with the scan reporting itself skipped, which is correct
+  # but means a green badge does not by itself prove the scan ran. Manual
+  # dispatch makes the gate re-runnable so that can be confirmed on demand
+  # rather than inferred from an empty commit.
+  workflow_dispatch:
 
 permissions:
   contents: read
