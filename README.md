@@ -187,7 +187,7 @@ Clone anywhere and point your agent at it, or copy `AGENTS.md` and `skills/` int
 
 ## What's inside
 
-**Rules** — `AGENTS.md`. 18 universal rules, 11 contract-driven ones, and a behavior contract covering intellectual honesty, scope discipline, the derive-versus-ask discipline, and adversarial self-review.
+**Rules** — `AGENTS.md`. 18 universal rules, 11 contract-driven ones, a session-state discipline for what a long conversation forgets, and a behavior contract covering intellectual honesty, scope discipline, the derive-versus-ask discipline, and adversarial self-review.
 
 **Skills** — 27, loaded on demand by task.
 

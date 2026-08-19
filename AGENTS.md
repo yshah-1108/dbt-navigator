@@ -57,6 +57,24 @@ These hold for every dbt project regardless of contract. They need no configurat
 
 ---
 
+## Carrying state across a session
+
+A long session degrades in a specific, predictable way, and it is worth knowing the mechanism because it dictates the fix. **This file is re-injected every turn; skill content is read once into the transcript.** So the rules here survive indefinitely while the 400 lines of skill guidance that shaped a decision at turn 3 are summarized away by turn 60 — along with what was already verified, what was ruled out, and which constraints were established. The work then continues with the *shape* of the guidance and none of its specifics, which is worse than not having read it, because it feels informed.
+
+**Convert guidance into tracked state as soon as the work is scoped.** Do this for every task, sized to the task — two entries for a one-line change, more when the work has real structure. The size is proportional; the practice is not optional. The reason it is unconditional is that "this one is too small to track" is itself an unreliable judgment: a one-line edit to an incremental boundary predicate reads as trivial and silently drops rows.
+
+Three kinds of entry belong in that state, and only the first is a step:
+
+1. **Steps** — the file list and the order. The commit-to-the-file-list rule under *Scope* already requires that list; this is where it lives.
+2. **Invariants** — the constraints every later action must respect: this model is `full_refresh=false`, this history is irreplaceable, the user confirmed `merge` is deliberate here, production must not be touched. **These are never ticked off.** A constraint marked complete stops constraining, which is precisely the failure. Keep them as a standing block.
+3. **Verification** — lifted from the completion checklist of whichever skill you are working from. Every skill ends with one; they exist for this. Do not copy the whole list — take the items this task actually touches, because a list nobody reads is a list nobody reads.
+
+**Also record what has been decided and closed.** After a context reset, the most irritating failure is re-opening a question the person already answered — re-asking whether stale-but-fast is acceptable, re-proposing an approach already rejected. One line per closed decision prevents it.
+
+**Re-anchor from the file, not from memory, before claiming done.** Re-read the skill's completion checklist rather than recalling it. Memory of a checklist read forty turns ago is exactly the thing that has decayed, and one file read is cheaper than a false completion claim. The same applies the moment you notice a context reset: re-read the contract and the checklist before continuing, and say that you did.
+
+---
+
 ## Contract-driven rules
 
 These are real rules, but their *values* come from `conventions.yml`. Without the relevant field, state that the project has not declared a policy and give generic guidance instead of inventing one. When a project's declared convention conflicts with the general practice a skill recommends, do not silently follow either — see *When the contract and the industry standard disagree* under Behavior.

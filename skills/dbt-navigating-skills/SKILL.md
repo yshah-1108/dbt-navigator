@@ -20,6 +20,8 @@ This skill is the entry point. It is 1.5% of the library and its whole job is to
 
 **The stopping rule:** you have read enough when you can state the grain, the verification you will run, and the failure mode you are guarding against. If you cannot state all three, you are missing a read. If you can, further reading is procrastination.
 
+**Then write those three down before editing anything.** What you just read is in the transcript, and the transcript is what a long session loses first — so the answers to the stopping rule are exactly what should become tracked state, along with the file list and the verification items from the checklist of whichever skill you read. `AGENTS.md` § *Carrying state across a session* has the rule and the three entry kinds. This is also the moment to note which skills you read: after a compaction, that list is the difference between re-reading two files and starting the orientation over.
+
 ---
 
 ## The phase spine
