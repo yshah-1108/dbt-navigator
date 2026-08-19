@@ -28,6 +28,8 @@ Write these files, then report. Do not print file contents back in your summary;
 
 Never invent a metric definition. If no source states what a metric means, leave that section empty and say so — a fabricated definition propagates into every model built afterwards.
 
+The same applies to `domain.md`'s business sections — which source systems feed the warehouse and what each is the system of record for, how entities link across systems, and what the central marts are for. You are a read-wide agent with no one to ask, so treat these as **collection, not conclusion**: record what the repository shows, mark every claim `NEEDS CONFIRMATION`, and return the open ones as questions for the parent to put to the team. Do not resolve "which system is authoritative" from a directory name — authority is a policy decision, not a naming artifact. The full procedure, including what only a person can answer, is `dbt-onboarding-to-a-project/mapping-the-business.md`.
+
 ## Return this structure, exactly
 
 ```
