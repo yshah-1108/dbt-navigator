@@ -171,7 +171,9 @@ Alternatively, skip plugins entirely and install just the skills with the `npx` 
 npx skills add yshah-1108/dbt-navigator --global
 ```
 
-Installs the skills into your agent's skills directory. Works with any agent that has adopted the [Agent Skills](https://agentskills.io/home) format.
+Installs the skills into your agent's skills directory. Works with any agent that has adopted the [Agent Skills](https://agentskills.io/home) format. It reads this repository from GitHub directly — nothing is published to npm, so the version you get is whatever `main` holds.
+
+**This route installs the 27 skills and their sub-documents, and nothing else** — not `AGENTS.md`, not `agents/`, not `schema/`. The skills are self-contained on technical matters, so the correctness rules that matter most (the `>=` incremental boundary, `delete+insert` on a reprocessing source, `full_refresh=false` on irreplaceable history) still reach you inside the skills that own them. What does not travel is the behavior contract — intellectual honesty, scope discipline, derive-versus-ask, never committing on `main` — plus the JSON schema that validates `conventions.yml`. If your agent reads an `AGENTS.md`, add it alongside as described below; if you want schema validation, clone instead.
 
 ### Codex / Gemini CLI / anything reading AGENTS.md
 
