@@ -88,7 +88,7 @@ Whether they come with the install depends on the channel, and it is not the sam
 | Install route | Do the subagents come too? |
 |---|---|
 | Claude Code plugin | **Yes.** `agents/` is a discovered component directory — no manifest field needed, the same way every official Anthropic plugin ships its agents. |
-| Cursor local plugin | **Yes, but as Claude-format files.** Cursor discovers `agents/` too, and its manifest allows an `agents` component. The frontmatter is the problem, not the location — see below. |
+| Cursor | **No, and there is no plugin route either.** An unlisted plugin dropped into `~/.cursor/plugins/local/` does not load — tested with a valid manifest, all 27 skills and `agents/` present, and Cursor loaded none of it. Install skills with `npx skills add`, then port the agents with the script below. |
 | `npx skills add` | **No.** That tool installs skills into a skills directory; it does not register subagents. Clone the repo (or copy `agents/`) if you want them. |
 | Clone for `AGENTS.md` | **They are simply there** in `agents/`, as text. Nothing registers them; use them as system prompts. |
 

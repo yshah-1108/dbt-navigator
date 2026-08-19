@@ -4,7 +4,7 @@
 
 A skills library that teaches coding agents how to work in a **dbt** project — and reads your conventions from a file you own, instead of imposing someone else's.
 
-Installable as a plugin for **Claude Code** and **Cursor** (Cursor via local install until it clears marketplace review). Works via `AGENTS.md` with **Codex**, **Gemini CLI**, and any agent that reads it.
+Installable as a plugin for **Claude Code**. Works in **Cursor** via `npx skills add`, and via `AGENTS.md` with **Codex**, **Gemini CLI**, and any agent that reads it.
 
 ## Why this exists
 
@@ -154,16 +154,22 @@ The marketplace lives in the same repo as the plugin, so adding the marketplace 
 
 ### Cursor
 
-Cursor's plugin marketplace is curated — plugins are submitted and manually reviewed before listing — so until this is accepted there, install it as a local plugin:
+Cursor's plugin marketplace is curated — plugins are submitted and manually reviewed before listing — and **there is no working path for installing an unlisted plugin by hand.** Dropping a clone into `~/.cursor/plugins/local/` does not load it: tested with a valid `.cursor-plugin/plugin.json`, all 27 skills, and the `agents/` directory in place, Cursor picked up none of it. Until it clears review, install the skills directly instead — this is the recommended route, not a workaround, and Cursor reads these paths natively:
 
 ```bash
-git clone https://github.com/yshah-1108/dbt-navigator.git \
-  ~/.cursor/plugins/local/dbt-navigator
+npx skills add yshah-1108/dbt-navigator --global   # ~/.cursor/skills/, all projects
+npx skills add yshah-1108/dbt-navigator            # this project only
 ```
 
-Then restart Cursor, or run **Developer: Reload Window**. Cursor reads `.cursor-plugin/plugin.json` and loads all 27 skills; check **Customize → Skills**.
+Confirm under **Customize → Skills**. For a project-local install, committing `.cursor/skills/` gives your whole team the same skills at the same version, which is usually what you want for a shared dbt repo.
 
-Alternatively, skip plugins entirely and install just the skills with the `npx` command below — Cursor reads `~/.cursor/skills/` and `.cursor/skills/` natively.
+The subagents need one extra step, because Cursor's agent format lacks the two fields these rely on:
+
+```bash
+python3 scripts/port-agents.py cursor <dest-repo>
+```
+
+Do not hand-copy them — see [`docs/subagents.md`](docs/subagents.md) for why a blind copy produces an agent that never reads its skills and holds write access it was designed not to have.
 
 ### Any agent supporting the Agent Skills standard
 
