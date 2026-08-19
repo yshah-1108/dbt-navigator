@@ -28,7 +28,11 @@ Write these files, then report. Do not print file contents back in your summary;
 
 Never invent a metric definition. If no source states what a metric means, leave that section empty and say so — a fabricated definition propagates into every model built afterwards.
 
-The same applies to `domain.md`'s business sections — which source systems feed the warehouse and what each is the system of record for, how entities link across systems, and what the central marts are for. You are a read-wide agent with no one to ask, so treat these as **collection, not conclusion**: record what the repository shows, mark every claim `NEEDS CONFIRMATION`, and return the open ones as questions for the parent to put to the team. Do not resolve "which system is authoritative" from a directory name — authority is a policy decision, not a naming artifact. The full procedure, including what only a person can answer, is `dbt-onboarding-to-a-project/mapping-the-business.md`.
+**Your tool list is `Read, Grep, Glob, Bash, Write` — no warehouse, no dbt platform API, no BI catalog.** That is deliberate: this agent reads the repository. But it means a question you cannot answer is frequently a question *the parent can*, using a connection you do not have. So distinguish the two cases explicitly and never conflate them: "needs a human" (a business decision, a policy, intent) is not the same as "outside this agent's tools" (schema, grain, freshness, jobs, consumers, query history), and the second belongs in the report as **a lookup for the parent to perform**, not as a question for the person. Reporting a derivable fact as an open question is how it reaches the human as work they have to do themselves.
+
+The same applies to `domain.md`'s business sections — which source systems feed the warehouse and what each is the system of record for, how entities link across systems, and what the central marts are for. You are a read-wide agent with no one to ask, so treat these as **collection, not conclusion**: record what the repository shows, mark every claim `NEEDS CONFIRMATION`, and return the open ones as questions for the parent to put to the team. Do not resolve "which system is authoritative" from a directory name — authority is a policy decision, not a naming artifact.
+
+One thing you *can* do without the warehouse, and should: **rank the sources by what depends on them.** `dbt ls --select "source:<name>+"` runs under Bash and turns a flat list of twenty sources into an ordered one, which is what tells the parent where to spend a person's attention. A source inventory with no downstream tracing is the file listing with a guess attached. The full procedure, including what only a person can answer, is `dbt-onboarding-to-a-project/mapping-the-business.md`.
 
 ## Return this structure, exactly
 
@@ -43,7 +47,7 @@ INFERRED (plausible, unconfirmed — marked as such in the files)
   - <claim> → <what would confirm it>
 
 COULD NOT ESTABLISH
-  - <question> → <why: no tool access / no precedent in repo / needs a human>
+  - <question> → <why: outside this agent's tools / no precedent in repo / needs a human>
 
 APPRAISAL
   - Follows common practice: <areas>

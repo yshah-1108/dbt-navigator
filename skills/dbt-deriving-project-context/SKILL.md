@@ -54,6 +54,31 @@ Naming is the most *visible* convention, so the steps below start there — but 
 
 The failure this guards against is narrowing "convention" to "naming," recording the prefixes, and leaving an agent to reinvent the project's dedup idiom or hand-roll what a mandated macro already does. When in doubt whether something is a convention, apply one test: **would an agent, not knowing this, produce code the team would reject in review?** If yes, it is a convention, wherever it lives.
 
+## 0. Inventory your instruments before deciding anything is unknowable
+
+**Do this first, before measuring anything, and do it without being asked.** The failure this prevents is specific and common: the pass runs entirely on the filesystem and git, produces a list of open questions for the human, and every one of them was answerable by a tool that was connected the whole time. The person then has to tell the agent it has tools — which is the agent asking someone to do its own capability discovery, the exact inversion of the derive-versus-ask rule.
+
+Check what is actually reachable, in one sweep:
+
+| Instrument | Answers | Without it |
+|---|---|---|
+| Warehouse query access | Schema, grain, cardinality, enum domains, real date ranges, query-log retention | Every claim about data becomes an inference from names |
+| dbt metadata or Cloud API | Jobs and their enabled state, schedules, run history, deferred manifests | Orchestration is a question rather than a measurement |
+| Query log | Who reads what, and how recently | No BI or ad-hoc consumer evidence at all |
+| Git host API | PRs behind a pattern, review discussion, `CODEOWNERS` | Intent must come from commit messages alone |
+| BI tool API or catalog | Dashboards and their owners | Consumers limited to declared exposures |
+
+**A tool you have not tried is not an absent tool.** Attempt one cheap call against each before concluding anything about coverage — a connection can be configured and unauthorized, or authorized and blind to the class you need, and those look identical from the config. Then apply `dbt-gathering-context` §3 to whatever comes back, because a well-formed empty answer is the most dangerous result any of them returns.
+
+Two rules follow, and they are the point of this step:
+
+- **Never write an open question for something a connected tool can answer.** Resolve it, or state which instrument you lack and what it would have told you. An "open question" that was one API call away trains the reader to stop reading your questions.
+- **When an instrument is genuinely missing, name it and recommend connecting it** — with the specific facts that stayed unknown as the reason. That is a far more useful hand-back than a bare question, because it tells the person what they are buying.
+
+Record the *result* of this sweep nowhere. Which tools are connected is live state, and a hand-maintained inventory of integrations rots faster than anything else in a config file. Rediscover it each session; it costs one sweep.
+
+---
+
 ## 1. Measure the taxonomy
 
 Count everything before naming anything. A convention is a majority practice, not a preference — and the exceptions are as informative as the rule.
@@ -290,6 +315,10 @@ If the schema rejects a value that is genuinely correct for this project, that i
 
 ## Completion checklist
 
+- [ ] Instruments inventoried first, with one cheap call attempted against each rather than assumed absent
+- [ ] No open question left standing that a connected tool could have answered; where an instrument is genuinely missing, it is named along with what it would have told you
+- [ ] Sources ranked by what depends on them — downstream marts and exposures traced, not table counts compared
+- [ ] Source freshness checked with a bounded date predicate; any source not landing data reported as a finding rather than listed as live
 - [ ] Prefix taxonomy measured with counts, and the match rate computed
 - [ ] Exceptions dated and recorded under `deviations` with reasons, not silently normalized
 - [ ] Layer materializations read from `dbt_project.yml`

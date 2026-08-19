@@ -14,7 +14,7 @@ You are building three things, in this order. Each one makes the next cheaper.
 
 Then, per central mart: what it is *for*, who reads it, and which decision it drives. Purpose is the fact that makes everything else interpretable, and it is never in the repository.
 
-## 1. Source systems: what feeds this warehouse
+## 1. Source systems: what feeds this warehouse, and what it powers
 
 Start from the sources, because every business fact enters through one and the source names carry the vendor vocabulary the rest of the project inherits.
 
@@ -24,7 +24,35 @@ grep -rh -A2 '^\s*- name:' models --include='*.yml' | head -60
 find models -name '*.yml' | xargs grep -l 'sources:' 2>/dev/null
 ```
 
-Group the sources by the system they come from, then answer per system — and these are **questions for a person**, because no query returns any of them:
+That list is the *starting* point, not the finding. **A source inventory that stops at "apparent subject, inferred from the name" is not a business map** — it is the file listing with a guess attached, and it reads as knowledge. Two things turn it into one, and both are derivable, so do them before asking anybody anything.
+
+**Trace what each source powers.** A source's importance is not its table count; it is what depends on it. For each source, walk the DAG downstream to the marts and exposures it ultimately feeds:
+
+```bash
+dbt ls --select "source:<source_name>+" --resource-type model | wc -l   # blast radius
+dbt ls --select "source:<source_name>+,resource_type:exposure"          # what it publishes to
+dbt ls --select "source:<source_name>+" --output name | grep -E '^(mart|fct|dim)' # its marts
+```
+
+A source feeding three marts and the executive dashboard is a different object than one feeding a single unused staging model, and the difference tells you which sources are worth a person's time in the questions below. Rank them this way rather than treating all twenty as equals.
+
+**Then look at the data, with a date filter.** A source's real shape settles several questions a name cannot:
+
+```sql
+-- what the recent data looks like -- always bounded, never a full scan
+select * from <database>.<schema>.<table>
+where <timestamp_column> >= dateadd(day, -7, current_date)
+limit 20;
+
+-- is this source live, or landed once and abandoned?
+select max(<timestamp_column>) as latest, count(*) as rows_last_7d
+from <database>.<schema>.<table>
+where <timestamp_column> >= dateadd(day, -7, current_date);
+```
+
+The date predicate is not optional politeness — on a large event table an unbounded scan is expensive and may time out, and a `limit` alone does not bound the scan. Sampling recent rows tells you what the source actually carries, in its own vocabulary, and whether it is still receiving data. **A source with no rows in the last week is a finding**, and one of the most valuable available here: it means either a broken pipeline nobody noticed or a system already retired, and both change what you should build on.
+
+Only then ask, and now the questions are cheap because you can attach what you found:
 
 | Question | Why it cannot be derived |
 |---|---|
@@ -34,7 +62,7 @@ Group the sources by the system they come from, then answer per system — and t
 | How does data arrive — batch, stream, CDC, manual upload? | Determines whether late-arriving rows and mutable history are expected. Changes incremental strategy. |
 | Is it being migrated, deprecated, or replaced? | The single highest-value fact here, and it exists only in someone's head. Building on a system being retired next quarter is wasted work. |
 
-The last one deserves its own emphasis. A project routinely contains two generations of the same source — the old system still landing data and the new one partially built — and nothing in the repository marks which is which. Both look live. Ask.
+The last one deserves its own emphasis. A project routinely contains two generations of the same source — the old system still landing data and the new one partially built — and nothing in the repository marks which is which. Both look live. Ask. If your freshness check found one of them stale, lead with that: "this source last landed data in March — is it retired?" is a question that answers itself in one reply.
 
 **Ingestion tooling is worth one question of its own.** Whether sources arrive via a managed connector, an in-house pipeline, or a reverse-ETL loop back into the warehouse changes what "the source changed" means and who can fix it. It is also invisible in a dbt project, which sees only the landed tables.
 
@@ -128,12 +156,15 @@ Three constraints, each preventing a specific failure:
 
 ## Failure modes
 
-1. **Profiling instead of understanding.** Row counts, max dates and null rates feel like progress and answer none of the questions above. Metadata is the instrument; the business map is the deliverable.
-2. **Inventing business meaning from names.** `dim_customer` does not tell you what a customer is here. A definition assembled from naming conventions reads authoritative and is a guess.
-3. **Assuming one system is authoritative because it has more rows.** Authority is a policy, not a row count.
-4. **Treating two systems' entities as the same population.** The most expensive error available here. Ask whether one is a subset or the overlap is partial, before writing the join.
-5. **Reading a discrepancy as a bug.** Two customer counts that never matched may be correct by definition. Classify with whoever owns the definition before "fixing" it.
-6. **Profiling dev and believing it.** A partial or 100-row dev copy makes every conclusion worthless, and the numbers look just as real.
-7. **Querying by filename on an aliased model.** You read a stale relation or nothing, and "no rows" reads as a finding.
-8. **Copying real data into a repository file.** The one irreversible mistake available in this pass.
-9. **Doing this for every model.** Twenty central models is a day well spent. Three hundred is a week that teaches less, because nobody reads the result.
+1. **A source inventory that is the file listing with a guess attached.** Twenty rows of "appears to be, inferred from the name" is not a business map. Every one of those rows had a derivable downstream blast radius, a measurable freshness, and twenty sample rows available, and none of that was gathered. This is the most likely way this pass produces something that looks thorough and teaches nothing.
+2. **Declaring something a question for the human that a connected tool answers.** See §0 of `dbt-deriving-project-context`. Asking someone to tell you their warehouse is reachable is the inversion of deriving.
+3. **Profiling instead of understanding.** Row counts, max dates and null rates feel like progress and answer none of the questions above. Metadata is the instrument; the business map is the deliverable.
+4. **Inventing business meaning from names.** `dim_customer` does not tell you what a customer is here. A definition assembled from naming conventions reads authoritative and is a guess.
+5. **Assuming one system is authoritative because it has more rows.** Authority is a policy, not a row count.
+6. **Treating two systems' entities as the same population.** The most expensive error available here. Ask whether one is a subset or the overlap is partial, before writing the join.
+7. **Reading a discrepancy as a bug.** Two customer counts that never matched may be correct by definition. Classify with whoever owns the definition before "fixing" it.
+8. **Profiling dev and believing it.** A partial or 100-row dev copy makes every conclusion worthless, and the numbers look just as real.
+9. **Querying by filename on an aliased model.** You read a stale relation or nothing, and "no rows" reads as a finding.
+10. **Scanning an event table without a date predicate.** A `limit` does not bound the scan. The query is expensive, may time out, and the timeout then gets reported as "could not establish."
+11. **Copying real data into a repository file.** The one irreversible mistake available in this pass.
+12. **Doing this for every model and every source equally.** Rank by what depends on them. Twenty central models is a day well spent; three hundred is a week that teaches less, because nobody reads the result.
