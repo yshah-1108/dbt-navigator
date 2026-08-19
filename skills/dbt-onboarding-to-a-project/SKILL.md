@@ -1,6 +1,6 @@
 ---
 name: dbt-onboarding-to-a-project
-description: Use when starting work in a dbt project you have not measured this session — a fresh install, a new repository, the first task after a context reset, or before touching a model whose consumers you have not enumerated. Covers DAG shape, terminal and dead nodes, the orchestrator, BI consumers, dbt version and adapter detection, test coverage, activity, and grandfathered patterns.
+description: Use when starting work in a dbt project you have not measured this session — a fresh install, a new repository, the first task after a context reset, or before touching a model whose consumers you have not enumerated. Covers DAG shape, terminal and dead nodes, orchestration and CI discovery including what each workflow is for, BI consumers, the business map of source systems and how entities link across them, dbt version and adapter detection, test coverage, activity, and grandfathered patterns.
 allowed-tools: Bash(${CLAUDE_SKILL_DIR}/survey-project.sh *) Bash(${CLAUDE_SKILL_DIR}/survey-project.sh)
 metadata:
   phase: orient
@@ -190,7 +190,7 @@ Then stop. **Deleting a model is `dbt-breaking-changes`, and it is a decision th
 
 ---
 
-## 5. Orchestrator discovery
+## 5. Orchestrator and CI discovery
 
 Nothing in the repository tells you what runs. **Tags express intent; only the scheduler knows truth.** A model tagged for an hourly cadence is a model somebody once intended to run hourly, and the job that would have done it may have been disabled two quarters ago.
 
@@ -198,6 +198,7 @@ Find the orchestrator by looking for its configuration, in decreasing order of h
 
 ```bash
 ls -d .github/workflows .gitlab-ci.yml .circleci dagster* airflow* dags 2>/dev/null
+ls .pre-commit-config.yaml 2>/dev/null                # not an orchestrator; changes what to do by hand
 grep -rln 'dbt build\|dbt run\|dbt-core\|dbt_cloud\|dbt seed' \
   .github .gitlab-ci.yml .circleci ci 2>/dev/null
 grep -rn 'dbt build\|dbt run' Makefile* justfile* scripts/ 2>/dev/null | head -20
@@ -222,6 +223,47 @@ Four outcomes, and each has a different honest report:
 Whatever you find, do not restate crons into the contract. A hand-maintained copy of live scheduling state rots silently and is then worse than nothing, which is exactly why the schema records tags and cadences rather than crons. `dbt-shipping-changes` covers what to do with this once you have a change to merge; the relevant fact on arrival is simply **which models are built by an automated job at all**, because a model nothing builds is a model whose freshness is nobody's responsibility.
 
 One trap specific to `schedules.default_tag`: a tag set globally in the project file is *inherited*, and it shows up on individual models in `dbt ls --select "tag:<tag>"` exactly as though it were declared there. Do not read an inherited tag as a per-model decision, and never add it to a model file.
+
+### Enumerating jobs on a managed platform
+
+When scheduling lives in a platform rather than the repo, the API is the only authority, and "read the API" is not a step until you know what to read. Three calls, in order, and the third is the one people skip:
+
+1. **List the jobs.** You want, per job: its name, whether it is *enabled*, its trigger (schedule, PR, API-only), and its cadence. A disabled job is the single most common reason a model that looks scheduled is not.
+2. **Read each job's steps** to get the actual dbt command and its selector. A job named for one domain routinely builds three.
+3. **Resolve every selector against the DAG** — `dbt ls --select "<selector>"` — and take the union. That union, not the tag list, is the set of models something builds. Anything outside it is unscheduled no matter what it is tagged.
+
+Where an MCP server or CLI for the platform is connected, these are three tool calls; `dbt-command-reference` covers the call shapes and the traps, including that metadata tools read the *deployed* manifest rather than your branch. Where nothing is connected, this is a question for the team rather than a guess — see below.
+
+Two failure modes worth naming because both produce a confident wrong answer. **Reading job names as scope**: names drift from selectors immediately and nobody notices, because the job still runs. And **ignoring the enabled flag**: a disabled job appears in the list, has a cadence, and builds nothing.
+
+### What each CI workflow is *for*
+
+Finding `.github/workflows/` tells you CI exists. It does not tell you what CI *does*, and the difference changes what you should do by hand. Read each workflow and classify it — the classification is the deliverable, not the file list:
+
+| Class | Tells you |
+|---|---|
+| **Builds or deploys dbt** | This is orchestration, not just a check. Its selector belongs in the union above. |
+| **PR quality gate** | What is already enforced mechanically — lint, compile, contract checks, a leak scan. Do not hand-check what a gate catches, and do not fight a gate you did not know existed. |
+| **Generates a committed artifact** | The highest-value class to spot: where exposures, docs, or a schema file are machine-written, hand-editing them is work that the next run silently reverts. This inverts a skill's advice from *write this* to *do not touch this*. |
+| **Unrelated to dbt** | Note and move on, so it is not re-read every session. |
+
+Also read `.pre-commit-config.yaml` if present. It is not in the `ls -d` sweep above because it is not an orchestrator, but it changes the same calculus: a formatter that runs on commit means formatting is not your job, and a hook that will reject your commit is worth knowing before you write it rather than after.
+
+For each workflow, the durable facts are its **purpose** and **what it enforces or generates** — not its YAML, which is one `cat` away. Those belong in `context.mechanisms`, whose template already has sections for CI checks that run on a PR and for generated artifacts.
+
+### When discovery runs out, ask — carrying what you already measured
+
+Two of the four outcomes above end in a question, and asking it well is the difference between a two-minute reply and an investigation you caused. You have just measured the DAG, the selectors and the workflows; put that in the ask. Batch these rather than asking serially:
+
+| Ask | Why no tool answers it |
+|---|---|
+| Which tool runs production builds, and where does its config live? | If it is in another repository or a UI, nothing here can see it. Absence of config is not absence of scheduling. |
+| Which job builds *the models this task touches*, and how often? | You can resolve selectors only for jobs you can enumerate. Name the models; do not ask them to explain the whole platform. |
+| What happens when a build fails — who is paged, does it retry, is there a backfill ritual? | Failure handling is a procedure someone chose. It is invisible in config and it determines whether a late model is an emergency. |
+| Does anything run *outside* that tool — a manual script, a periodic backfill, a reverse-ETL job? | The orchestrator cannot report what does not run in it, and this class is where surprise consumers live. |
+| Which of these jobs must not be allowed to fail? | Criticality is a business ranking. Every job in a list looks equally important. |
+
+Record the answers where they will not rot: `orchestrator.type` and `orchestrator.config_path` in the contract, and the procedural half — failure handling, the backfill ritual, what runs outside the orchestrator — in `context.mechanisms`. **Do not record the cadences you were just told.** A cron you transcribed is a cron that will be wrong within a quarter and will still read as authoritative; the tool that owns it is one call away. Record *which tool to ask*, not its current answer.
 
 ---
 
@@ -254,6 +296,18 @@ limit 25
 **Before trusting any tool's empty answer here, prove it can see the class you asked about.** A catalog or lineage tool integrated with one BI product and blind to another returns the same empty list for both, in the same confident language. Query it for *any* asset of that type first: zero assets means the instrument is blind and its negative is worth nothing. The technique is in `dbt-gathering-context`; this is where it is most often skipped, and reporting "no BI impact" on the strength of a blind tool is how a dashboard breaks the morning after a merge.
 
 Report BI coverage as a *scope*, never as an absolute: "no references in the two repositories the contract lists, and no reads in the 7-day query log" is a claim you can defend. "No BI consumers" is not.
+
+---
+
+## 6b. Map the business behind the models
+
+Everything so far reads the repository, the manifest and the logs — so everything so far describes the project's *shape*. None of it tells you what the data is **about**: which operational systems feed this warehouse and what each is the system of record for, that the CRM's "customer" is a signed contract while the product database's is a login, that two sources describe overlapping but non-identical populations, or which of `fct_revenue` and `fct_bookings` Finance actually closes the books on. That is the layer where an agent's errors get expensive, because the SQL compiles, the tests pass, and the number is wrong in a way only someone who knows the business can see.
+
+Three things to build, each making the next cheaper: a **source-system inventory** (what feeds this, what each system is authoritative for, what is being migrated), an **entity map** (the business nouns, which datasets represent each, which one wins when they disagree), and the **join fabric** (how entities link across systems, on which keys, at what match rate, and what unmatched rows mean). Then per central mart: what decision it drives and who breaks if it is wrong.
+
+Almost none of this is derivable. The source list is in the repo; what a source is *for* is not. The join key is measurable; whether the two populations are supposed to match is a business fact. So this pass is mostly **structured asking**, which is why it belongs on arrival where the questions can be batched — and why the questions must carry what you already measured. Sampling actual values is one instrument here rather than the goal: it checks the map and surfaces the vocabulary nobody documented, but no volume of row counts will tell you which system is the system of record.
+
+The question sets, the sampling queries that reveal meaning rather than metadata, and the recording rules are in [`mapping-the-business.md`](./mapping-the-business.md). What you learn goes in `context.domain_notes`; `dbt-deriving-project-context` owns that artifact and the rule that keeps it honest — record interpretation, never measurement, and leave what nobody confirmed visibly empty rather than filling it with a plausible guess.
 
 ---
 
@@ -353,6 +407,8 @@ Every item here is something an agent does out of helpfulness, and every one of 
 
 Onboarding output is a short brief, not a report: node counts, the version and adapter, the highest-fan-out models, what schedules this project, what consumes it and how confidently you know, where coverage is thin, and any stated gap. Then the task.
 
+**Not every arrival needs every section.** Steps 1–8 are the graph and its guarantees — cheap, mechanical, and worth running whenever you arrive cold. The business map in 6b is different in kind: it is mostly asking people, its answers change on the timescale of reorganizations rather than commits, and it is written down once and then read. Run it when the project has no `context.domain_notes`, when what is there is stale enough to mislead, or when the task turns on business meaning — a metric definition, a cross-system join, which of two similar marts is canonical. Do not re-interview the team on a Tuesday to fix a typo. Where the artifact already exists, reading it *is* this step.
+
 ## Completion checklist
 
 - [ ] Contract read; absent fields named, with the specific degradation stated rather than guessed around
@@ -367,9 +423,20 @@ Onboarding output is a short brief, not a report: node counts, the version and a
 - [ ] Dead-model candidates required all three tests — no children, no exposure, no reads — with the evidence attached and no deletion proposed
 - [ ] Query-log window and retention stated, so a quiet log is not read as an absent consumer
 - [ ] Orchestrator located, or its absence stated as a question; selectors resolved against the DAG rather than inferred from tags
+- [ ] Platform jobs enumerated with their *enabled* state, not just their names; every selector resolved and unioned
+- [ ] CI workflows read and classified by purpose, not merely listed; generated artifacts identified as do-not-hand-edit
+- [ ] `.pre-commit-config.yaml` checked, so hooks are known before a commit is rejected rather than after
+- [ ] Orchestration questions no config answers — failure handling, what runs outside the orchestrator, which jobs must not fail — asked in one batch, carrying the selectors already measured
+- [ ] Cadences not transcribed into any file; the tool that owns them recorded instead
 - [ ] Inherited `schedules.default_tag` not mistaken for a per-model declaration
 - [ ] BI consumers traced from the contract, exposures, and the query log; instrument coverage proven before any negative was reported
 - [ ] BI findings reported as a scope, never as "no consumers"
+- [ ] Source systems inventoried, each with what it is the system of record for, and any migration-in-progress named
+- [ ] Core entities defined in business terms, with the authoritative dataset per entity and the trap a newcomer falls into
+- [ ] Cross-system links recorded with cardinality and whether a sub-100% match rate is expected — before any join was written
+- [ ] Purpose established for the central marts: what decision each drives, and which similar model it must not be confused with
+- [ ] Data sampled against **production** with explicit database and schema, using compiled relation names rather than filenames
+- [ ] Interpretation recorded rather than measurement; nothing confirmed by nobody left as a plausible guess, and no real data values written to any file
 - [ ] Untested models counted, and the count crossed against child counts to locate real risk
 - [ ] Activity measured from git; shallow-clone and bulk-reformat caveats checked before trusting dates
 - [ ] Ownership taken from `CODEOWNERS` or `meta`, not from the last committer

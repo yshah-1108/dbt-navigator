@@ -7,7 +7,7 @@ metadata:
 
 # Navigating the skill set
 
-This library holds 27 skills across 77 files and roughly 19,000 lines. A single ordinary task — "add a column to an incremental mart model" — has plausible description matches totalling over 8,000 lines. **Reading everything that might be relevant is not an option, and reading whatever matched first is how a task gets done wrongly with confidence.**
+This library holds 27 skills across 78 files and roughly 19,300 lines. A single ordinary task — "add a column to an incremental mart model" — has plausible description matches totalling over 8,000 lines. **Reading everything that might be relevant is not an option, and reading whatever matched first is how a task gets done wrongly with confidence.**
 
 This skill is the entry point. It is 1.5% of the library and its whole job is to tell you which few hundred lines to read next.
 
@@ -190,6 +190,8 @@ Escalate only if: the model is consumed by BI or has grants applied out of band 
 ### H. New to the project
 
 Read `dbt-onboarding-to-a-project` in full — it is the one skill designed to be read start to finish. If `conventions.yml` is missing, `dbt-deriving-project-context` comes first, because everything else depends on the contract existing.
+
+Its business-map pass (§6b, `mapping-the-business.md`) is the one section that is conditional rather than routine: run it when `context.domain_notes` is missing or stale, or when the task turns on business meaning — a metric definition, a cross-system join, which of two similar marts is canonical. It is mostly structured asking, so batch the questions. Where the artifact already exists, reading it is the step.
 
 ### I. Add or improve tests on an existing model
 
