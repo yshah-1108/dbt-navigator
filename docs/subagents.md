@@ -81,6 +81,25 @@ For Cursor, this is scripted — `python3 scripts/port-agents.py cursor <dest-re
 | Codex / Gemini CLI | paste the body as a system prompt | same treatment as Cursor, by hand |
 | Anything else | the body is just text | keep the return contract verbatim |
 
+## How the subagents arrive
+
+Whether they come with the install depends on the channel, and it is not the same answer everywhere.
+
+| Install route | Do the subagents come too? |
+|---|---|
+| Claude Code plugin | **Yes.** `agents/` is a discovered component directory — no manifest field needed, the same way every official Anthropic plugin ships its agents. |
+| Cursor local plugin | **Yes, but as Claude-format files.** Cursor discovers `agents/` too, and its manifest allows an `agents` component. The frontmatter is the problem, not the location — see below. |
+| `npx skills add` | **No.** That tool installs skills into a skills directory; it does not register subagents. Clone the repo (or copy `agents/`) if you want them. |
+| Clone for `AGENTS.md` | **They are simply there** in `agents/`, as text. Nothing registers them; use them as system prompts. |
+
+**Do not just copy the files into Cursor.** Claude Code's format carries two fields Cursor's does not: `skills:`, which preloads full skill content at startup, and `tools:`, a real allowlist. A blind copy produces an agent that never reads its skills and silently holds write access it was designed not to have — three of these four are read-only by design. Run the port script instead:
+
+```bash
+python3 scripts/port-agents.py cursor <dest-repo>
+```
+
+It moves what the target cannot express in frontmatter into the body as instructions. The script ships with a clone and with the npm package.
+
 Two mechanical differences, both confirmed against a shipped Cursor plugin rather than assumed:
 
 1. **`skills:` preloading may not exist.** In Claude Code that field injects full skill content at startup. Cursor has no equivalent — its agents name skills in the prose instead. The port script therefore prepends a "read these first" block listing the same skills. Same outcome, one extra step at runtime.
