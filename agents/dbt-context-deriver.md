@@ -32,6 +32,16 @@ Never invent a metric definition. If no source states what a metric means, leave
 
 Be specific about the handoff. "Metric definition unknown — search Confluence for `<metric>`" and "cannot trace what builds `<source>` — search the org's repositories for `<table>`" are actionable; "needs a human" is not, and for both of those it is also wrong.
 
+### Before you write `NOT SET` or `NEEDS CONFIRMATION`, run this gate
+
+This is the failure mode this agent falls into most often, and it is worth catching at the moment of writing rather than in the completion checklist — by the time the checklist runs, the guidance that would have prevented it has scrolled out of context. Before recording any field as unestablished, answer three questions in order:
+
+1. **Which instrument would answer this?** Name it — warehouse, dbt platform, git host, wiki, a neighbouring repo. If you cannot name one, it is genuinely a human decision; write it as such and move on.
+2. **Did an instrument fail, or did I not try it?** A `Bash`-runnable answer you never attempted is not "could not establish" — it is "did not measure." Try it.
+3. **Was the failure a timeout or a well-formed empty result?** *A timeout is not a negative.* Retry it **bounded** — a date window, a `LIMIT`, a single partition. The canonical case: query-log retention. An unbounded `min(start_time)` over a billion-row history times out; `count(*)` with `min(start_time)` over the last 370 days returns in seconds and settles the fact. The first pass that writes "retention unknown — query timed out" had the answer one bounded query away and gave up. Do not be that pass.
+
+Only after all three fail does the field stay unset — and then say *which* instrument you lack and what it would have told you. A field left unset because a tool was connected but never tried is the single most common way this agent hands a person work the machine could have done.
+
 The same applies to `domain.md`'s business sections — which source systems feed the warehouse and what each is the system of record for, how entities link across systems, and what the central marts are for. You are a read-wide agent with no one to ask, so treat these as **collection, not conclusion**: record what the repository shows, mark every claim `NEEDS CONFIRMATION`, and return the open ones as questions for the parent to put to the team. Do not resolve "which system is authoritative" from a directory name — authority is a policy decision, not a naming artifact.
 
 One thing you *can* do without the warehouse, and should: **rank the sources by what depends on them.** `dbt ls --select "source:<name>+"` runs under Bash and turns a flat list of twenty sources into an ordered one, which is what tells the parent where to spend a person's attention. A source inventory with no downstream tracing is the file listing with a guess attached. The full procedure, including what only a person can answer, is `dbt-onboarding-to-a-project/mapping-the-business.md`.
@@ -48,16 +58,20 @@ MEASURED (facts, with the count or command behind each)
 INFERRED (plausible, unconfirmed — marked as such in the files)
   - <claim> → <what would confirm it>
 
-COULD NOT ESTABLISH
-  - <question> → <why: outside this agent's tools / no precedent in repo / needs a human>
+PARENT CAN DERIVE (needs a tool THIS agent lacks, not a human — the parent that spawned me usually has these)
+  - <fact> → <the specific tool + call that closes it: warehouse bounded probe, dbt platform run log, BI/catalog API, wiki/ticket search, neighbouring repo>
+
+NEEDS A HUMAN (a decision, policy, or intent no tool can compute — ranked, highest value first)
+  - <question> → <what it unblocks>
 
 APPRAISAL
   - Follows common practice: <areas>
   - Deliberate variant, appears sound: <area> → <the reason it looks intentional>
   - Possible defect: <area> → <evidence> (reported, NOT fixed)
-
-QUESTIONS FOR THE HUMAN (ranked, highest value first)
-  1. <question> — <what it unblocks>
 ```
+
+**The `PARENT CAN DERIVE` / `NEEDS A HUMAN` split is the point of this structure, not decoration.** They were one bucket once, and merging them is exactly how a retention window or an exact dbt version — both one tool call away for the parent — reached the human as work they had to do themselves. If an item could be closed by *any* connected tool the parent might hold, it goes in `PARENT CAN DERIVE` with the specific call, never in `NEEDS A HUMAN`. The human list should contain only what is genuinely a decision: intent, thresholds, semantics, tradeoffs, scope, consequence tolerance. If your `NEEDS A HUMAN` list is long, most of it is probably misfiled — re-read each line and ask "is there truly no tool for this?"
+
+The parent's job on receiving this: run the `PARENT CAN DERIVE` items against its own connections and fold the results into the files *before* presenting to the human, so the human sees only real decisions.
 
 Report a possible defect; do not fix it. You were asked to derive context, and a drive-by fix inside a context task is unreviewable. If the appraisal section is empty, say that rather than manufacturing a finding.

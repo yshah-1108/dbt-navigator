@@ -82,14 +82,20 @@ You do not write `conventions.yml` from scratch. After installing (see [Installa
 ```
 Read the dbt-deriving-project-context skill and derive this project's context.
 Measure the repo, don't assume — and use whatever tools you have (warehouse,
-dbt, git host, wiki) before deciding something is unknowable. Map the business
-too: the source systems, what each powers, and what the main marts are for.
-Write conventions.yml plus the .dbt-agent/ prose files, cite the count behind
-each value, mark inferences NEEDS CONFIRMATION, and finish by telling me what
-this first pass covers, what is thin, and what you could not establish.
+dbt, git host, wiki) before deciding something is unknowable. If a query times
+out, retry it bounded by a date window or row limit — a timeout is not a
+"could not establish". Before writing any field as NOT SET, name the tool that
+would answer it and try that tool first. Map the business too: the source
+systems, what each powers, and what the main marts are for. Write conventions.yml
+plus the .dbt-agent/ prose files, cite the count behind each value, mark
+inferences NEEDS CONFIRMATION, and finish by telling me what this first pass
+covers, what is thin, and — split apart — what YOU can still close with a tool
+versus what genuinely needs a decision from me.
 ```
 
 The agent measures your repo — prefix distribution, separator, materializations, timestamp suffixes, surrogate key naming, schedule tags — and presents a draft with adherence percentages for you to confirm. Only genuinely unknowable fields become questions.
+
+**A note on tools and the two-step it implies.** If your agent runs the derivation through the bundled context-deriver subagent (in `agents/`), that subagent reads the repository only — it has no warehouse or platform connection of its own. So it will return a short list of facts it *could not reach but a tool could* (query-log retention, the exact dbt-core version, whether a neighbouring BI repo still reads production) kept separate from the things that need a decision from you. The parent agent — the one you're talking to, which does have your connections — should close that first list against them before handing you the file, so what reaches you is only real decisions. If you find tool-derivable items sitting in your question list, the fix is one message: *"close the parent-derivable ones with the tools you have, then re-present."*
 
 It also does two things a taxonomy pass alone does not. It finds the **bespoke machinery** your project already has, so an agent stops hand-rolling what you solved years ago — including overridden dbt built-ins, which appear in no model file because dbt calls them automatically. And it **appraises** what it finds: each practice is recorded as best practice, a deliberate variant that works better here, or a candidate defect. Findings are reported, not silently corrected.
 

@@ -301,6 +301,8 @@ Populate the four artifacts. Two habits carry most of the value:
 
 **Leave a field unset rather than guessing it.** An absent field makes a skill withhold version-gated advice or ask a human. A *wrong* field makes it confidently recommend something unavailable, or classify a production build as a sandbox. Unset is a safe state; wrong is not. Say in a comment why it is unset and what would settle it.
 
+> **The gate, before any field is written unset.** "Do not guess" is not "do not measure" — and the common failure is reading the first as the second, leaving a field blank that one command would have filled. So before `NOT SET` goes in, in order: **(1)** name the instrument that would answer it — if none exists, it is genuinely unset, write it; **(2)** confirm you *tried* that instrument, because a `Bash`-runnable or MCP-reachable answer you never attempted is "did not measure," not "could not establish"; **(3)** if the attempt timed out or came back empty, retry it **bounded** — a date window, a `LIMIT`, one partition — since *a timeout is not a negative*. The textbook case is query-log retention: an unbounded `min(start_time)` times out on a large account, while `count(*)` with `min(start_time)` over the last ~370 days returns in seconds and settles it. Only after a *bounded attempt* against a *named* instrument fails does the field stay unset — with a comment naming the instrument and what it would have told you. A field left blank because a connected tool was never tried is the error this whole skill exists to prevent.
+
 The fields that most often get guessed, and should not be:
 
 - **dbt version.** A CLI version is not the dbt-core version that skills gate advice on.
