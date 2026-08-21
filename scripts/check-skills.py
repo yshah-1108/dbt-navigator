@@ -423,7 +423,9 @@ def main() -> int:
 
     # 6. the README skill table and the skills on disk agree
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
-    listed = set(re.findall(r"\b(dbt-[a-z0-9-]+)\b", readme)) - NOT_SKILLS
+    # agent_names are valid dbt-* tokens too (an agent may be named in the
+    # README without being a skill), so exempt them here exactly as check 5 does.
+    listed = set(re.findall(r"\b(dbt-[a-z0-9-]+)\b", readme)) - NOT_SKILLS - agent_names
     listed = {name for name in listed if name.startswith("dbt-")}
     for name in sorted(skill_dirs - listed):
         problems.append(f"README.md: skill '{name}' exists on disk but is not listed")
